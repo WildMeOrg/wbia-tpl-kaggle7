@@ -36,7 +36,7 @@ LOAD_IF_CAN = True
 name = f'VGG16-GeMConst-bbox-PCB4-{SZ}-NOVAL-Ring-CELU'
 
 data = (
-    ImageItemListGray
+    ImageListGray
         .from_df(df[df.Id != 'new_whale'], 'data/crop_train', cols=['Image'])
         .split_by_valid_func(lambda path: path2fn(path) in val_fns)
         .label_from_func(lambda path: fn2label[path2fn(path)])
@@ -99,7 +99,7 @@ print ("Stage 2 done, stage 3 done")
 df = pd.read_csv('data/train.csv')
 classes = learn.data.classes + ['new_whale']
 data = (
-    ImageItemListGray
+    ImageListGray
         .from_df(df, 'data/crop_train', cols=['Image'])
         .no_split()
         .label_from_func(lambda path: fn2label[path2fn(path)], classes=classes)

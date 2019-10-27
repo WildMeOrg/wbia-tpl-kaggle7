@@ -262,7 +262,7 @@ def open_image_grey(fn:PathOrStr, div:bool=True, convert_mode:str='RGB', cls:typ
 
 
 
-class ImageItemListGray(ImageItemList):
+class ImageListGray(ImageList):
     def open(self, fn:PathOrStr)->Image:
         return open_image_grey(fn)
     

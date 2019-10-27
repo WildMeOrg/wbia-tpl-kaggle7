@@ -34,11 +34,11 @@ LOAD_IF_CAN = True
 name = f'VGG16-GeMConst-bbox-PCB4-{SZ}-val-Ring-CELU'
 
 data = (
-    ImageItemListGray
+    ImageListGray
         .from_df(df[df.Id != 'new_whale'], 'data/crop_train', cols=['Image'])
         .split_by_valid_func(lambda path: path2fn(path) in val_fns)
         .label_from_func(lambda path: fn2label[path2fn(path)])
-        .add_test(ImageItemList.from_folder('data/crop_test'))
+        .add_test(ImageList.from_folder('data/crop_test'))
         .transform(get_transforms(do_flip=False), size=SZ, resize_method=ResizeMethod.SQUISH)
         .databunch(bs=BS, num_workers=NUM_WORKERS, path='data')
         .normalize(imagenet_stats)
@@ -102,11 +102,11 @@ new_whale_fns = set(df[df.Id == 'new_whale'].sample(frac=1).Image.iloc[:1000])
 y = val_fns.union(new_whale_fns)
 classes = learn.data.classes + ['new_whale']
 data = (
-    ImageItemListGray
+    ImageListGray
         .from_df(df, 'data/crop_train', cols=['Image']) 
         .split_by_valid_func(lambda path: path2fn(path) in y)
         .label_from_func(lambda path: fn2label[path2fn(path)], classes=classes)
-        .add_test(ImageItemList.from_folder('data/crop_test'))
+        .add_test(ImageList.from_folder('data/crop_test'))
         .transform(get_transforms(do_flip=False, max_zoom=1,
                                   max_warp=0,
                                   max_rotate=2), size=SZ, resize_method=ResizeMethod.SQUISH)
