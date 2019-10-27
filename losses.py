@@ -28,7 +28,7 @@ class RingLoss(Callback):
     def on_loss_begin(self, last_output:Tuple[list,list], **kwargs):
         "Save the extra outputs for later and only returns the true output."
         self.feature_out = last_output[1]
-        return last_output[0]
+        return {'last_output': last_output[0]}
 
     def on_backward_begin(self,
                           last_loss:Rank0Tensor,
@@ -49,7 +49,7 @@ class RingLoss(Callback):
             else:
                 loss = loss + diff.mean()
         if self.alpha != 0.:  last_loss += (self.alpha * loss).sum()
-        return last_loss
+        return {'last_loss': last_loss}
 
 @dataclass
 class CenterLoss(Callback):
@@ -62,7 +62,7 @@ class CenterLoss(Callback):
     def on_loss_begin(self, last_output:Tuple[list,list], **kwargs):
         "Save the extra outputs for later and only returns the true output."
         self.feature_out = last_output[1]
-        return last_output[0]
+        return {'last_output': last_output[0]}
 
     def on_backward_begin(self,
                           last_loss:Rank0Tensor,
@@ -96,7 +96,7 @@ class CenterLoss(Callback):
             else:
                 loss = loss + dist.mean()
         if self.alpha != 0.:  last_loss += (self.alpha * loss).sum()
-        return last_loss
+        return {'last_loss': last_loss}
 
 def MultiCE(x,targs):
     loss = None
