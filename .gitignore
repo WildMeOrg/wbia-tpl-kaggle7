@@ -1,0 +1,12 @@
+.DS_Store
+
+crop_test/
+crop_train/
+sample_submission.csv
+test.zip
+test/
+train.csv
+train.zip
+train/
+
+
