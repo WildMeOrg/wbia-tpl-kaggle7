@@ -53,33 +53,33 @@ def create_submission(preds, data, name, classes=None):
     sub = pd.DataFrame({'Image': [path.name for path in data.test_ds.x.items]})
     sub['Id'] = top_5_pred_labels(preds, classes)
     sub.to_csv(f'subs/{name}.csv.gz', index=False, compression='gzip')
-
     
-def find_new_whale_th(preds, targs):
+def find_new_whale_th(preds, targs, num_classes=5004):
     with torch.no_grad():
-        if preds.size(1) == 5004:
+        if preds.size(1) == num_classes:
             preds2 = torch.cat((preds, torch.ones_like(preds[:, :1])), 1)
         else:
             preds2 = preds.clone()
         res = []
         ps = np.linspace(0, 0.95, 121)
         for p in ps:
-            preds2[:, 5004] = p
+            preds2[:, num_classes] = p
             res.append(map5(preds2, targs).item())
         best_p = ps[np.argmax(res)]
         #print (res, best_p)
-        preds2[:, 5004] = best_p
+        preds2[:, num_classes] = best_p
         score = map5(preds2, targs)
         print('score=',score, 'th=',best_p)
     return preds2, best_p, score
-def find_softmax_coef(preds, targs, softmax_coefs = [0.5, 0.75, 1.0, 1.5, 2.0, 2.2]):
+
+def find_softmax_coef(preds, targs, softmax_coefs = [0.5, 0.75, 1.0, 1.5, 2.0, 2.2], num_classes=5004):
     best_preds = None
     best_th = -100
     best_score = 0
     best_sm_th = 0
     for sc in softmax_coefs:
         sm_preds = torch.softmax(sc*preds, dim=1).cpu()
-        preds2, best_p, score = find_new_whale_th(sm_preds, targs)
+        preds2, best_p, score = find_new_whale_th(sm_preds, targs, num_classes=num_classes)
         if score > best_score:
             best_preds = preds2
             best_th = best_p
@@ -89,13 +89,15 @@ def find_softmax_coef(preds, targs, softmax_coefs = [0.5, 0.75, 1.0, 1.5, 2.0, 2
     return best_preds, best_th, best_sm_th, best_score
 def get_train_features(learn, augment=3):
     ####### Now features
-    torch.cuda.empty_cache()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
     try:
         all_preds0, all_gt0,all_feats0,all_preds20 = get_predictions(learn.model,learn.data.train_dl)
     except:
         all_preds0, all_gt0,all_feats0,all_preds20 = get_predictions_non_PCB(learn.model,learn.data.train_dl)
     for i in range(max(augment,0)):
-        torch.cuda.empty_cache()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
         try:
             all_preds00, all_gt00,all_feats00,all_preds200 = get_predictions(learn.model,learn.data.train_dl)
         except:
@@ -122,7 +124,8 @@ def find_mixing_proportions(sm_preds, sim, sim_th, targs):
     return out_preds, thlist, best_score
 
 def get_predictions(model, val_loader):
-    torch.cuda.empty_cache()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
     model.eval()
     all_preds = []
     all_confs = []
@@ -149,7 +152,8 @@ def get_predictions(model, val_loader):
         print(out)
     return all_preds, all_gt,all_feats,all_preds2
 def get_predictions_non_PCB(model, val_loader):
-    torch.cuda.empty_cache()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
     model.eval()
     all_preds = []
     all_confs = []
@@ -243,11 +247,12 @@ def get_shortlist_fnames_test(distance_matrix_idxs, class_sims, df, learn, val_l
 
 
 def batched_dmv(d1,d2):
-    torch.cuda.empty_cache()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
     out = torch.zeros(d1.size(0), d2.size(0))
     d2_sq1 = torch.sum(d2**2, dim=1).unsqueeze(-1)
     try:
-        out = distance_matrix_vector(d1.cuda(),d2.cuda(),d2_sq1.cuda()).cpu()
+        out = distance_matrix_vector(d1.to(get_device()),d2.to(get_device()),d2_sq1.to(get_device())).cpu()
     except:
         out = distance_matrix_vector(d1,d2,d2_sq1).cpu()
     return out

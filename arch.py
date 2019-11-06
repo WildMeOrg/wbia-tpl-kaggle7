@@ -19,6 +19,9 @@ import torch.nn.functional as F
 from torch.nn.parameter import Parameter
 import torch.nn as nn
 
+def get_device():
+    return torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+
 def gem(x, p=3, eps=1e-5):
     return torch.abs(F.avg_pool2d(x.clamp(min=eps, max=1e4).pow(p), (x.size(-2), x.size(-1))).pow(1./p))
 class L2Norm(nn.Module):
@@ -77,7 +80,7 @@ class PCBRingHead2(nn.Module):
                                       nn.Linear(in_features=feat_dim*num_clf,
                                                 out_features=num_classes, bias=True))
         for i in range(num_clf):
-            self.rings.append(nn.Parameter(torch.ones(1).cuda()*r_init))
+            self.rings.append(nn.Parameter(torch.ones(1).to(get_device())*r_init))
         for i in range(num_clf):
             self.local_FE_list.append(nn.Sequential(GeMConst(3.74), Flatten(),
                         nn.BatchNorm1d(in_feat, eps=1e-05, momentum=0.1,

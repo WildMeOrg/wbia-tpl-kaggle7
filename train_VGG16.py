@@ -17,6 +17,9 @@ from arch import *
 from utils import *
 from losses import *
 import torchvision
+
+print("torch.cuda.is_available:", torch.cuda.is_available())
+
 df = pd.read_csv('data/train.csv')
 val_fns = pd.read_pickle('data/val_fns')
 
@@ -30,6 +33,9 @@ SEED=0
 SAVE_TRAIN_FEATS = False
 SAVE_TEST_MATRIX = False
 LOAD_IF_CAN = True
+
+num_classes = 5004
+num_epochs = 100
 
 name = f'VGG16-GeMConst-bbox-PCB4-{SZ}-val-Ring-CELU'
 
@@ -47,7 +53,7 @@ class CustomPCBNetwork(nn.Module):
     def __init__(self, new_model):
         super().__init__()
         self.cnn =  new_model.features
-        self.head = PCBRingHead2(5004, 512, 4, 512)
+        self.head = PCBRingHead2(num_classes, 512, 4, 512)
     def forward(self, x):
         x = self.cnn(x)
         out = self.head(x)
@@ -69,7 +75,7 @@ if LOAD_IF_CAN:
     except:
         LOADED = False
 if not LOADED:
-    learn.fit_one_cycle(100, 1e-2/1.5)#6.7e-3
+    learn.fit_one_cycle(num_epochs, 1e-2/1.5)#6.7e-3
     learn.save(name)
 print ('Stage 1 done, finetuning everything')
 
@@ -86,7 +92,7 @@ if LOAD_IF_CAN:
         LOADED = False
 
 if not LOADED:
-    learn.fit_one_cycle(100, lrs)
+    learn.fit_one_cycle(num_epochs, lrs)
     learn.save(name + '_unfreeze')
 print ("Stage 2 done, starting stage 3")
 
@@ -119,7 +125,7 @@ data.valid_dl.dl.batch_sampler.sampler = torch.utils.data.SequentialSampler(data
 data.valid_dl.dl.batch_sampler.drop_last = False
 
 learn.data = data
-targs = torch.tensor([classes.index(label.obj) if label else 5004 for label in learn.data.valid_ds.y])
+targs = torch.tensor([classes.index(label.obj) if label else num_classes for label in learn.data.valid_ds.y])
 
 ####
 val_preds, val_gt,val_feats,val_preds2 = get_predictions(learn.model,data.valid_dl)
@@ -136,8 +142,8 @@ class_sims_th, best_th_feats, score_feats_th = find_new_whale_th(class_sims, tar
 out_preds, thlist, best_score = find_mixing_proportions(best_preds,
                                                        class_sims,
                                                       class_sims_th,targs)
-out_preds = out_preds.cuda()
-targs = targs.cuda()
+out_preds = out_preds.to(device)
+targs = targs.to(device)
 print ("Best mix score = ", best_score)
 print ("Val top1 acc = ", accuracy(out_preds, targs).cpu().item())
 print ("Val map5 = ",map5(out_preds, targs).cpu().item())
@@ -147,17 +153,17 @@ thresholds['softmax'] = best_sm_th
 thresholds['preds_th'] = best_th
 thresholds['preds_th_feats'] = best_th_feats
 thresholds['mix_list'] = thlist
-torch.save(thresholds, name + '_thresholds.pth')
+torch.save(thresholds, 'data/models/' + name + '_thresholds.pth')
 
 if SAVE_TRAIN_FEATS:
     print ("Saving train feats")
-    torch.save({"train_labels": train_labels.detach().cpu(), 
+    torch.save({"train_labels": train_labels.detach().cpu(),
                 "train_feats": train_feats.detach().cpu(),
                 "val_labels": targs,
                 "val_feats": val_feats.detach().cpu(),
                 "classes": classes,
                 "thresholds": thresholds,
-                }, name + 'train_val_feats.pt')
+                }, 'data/models/' + name + '_train_val_feats.pt')
 
 
 
@@ -166,7 +172,7 @@ if SAVE_TRAIN_FEATS:
 test_preds,  test_gt,test_feats,test_preds2 = get_predictions(learn.model,data.test_dl)
 preds_t = torch.softmax(best_sm_th * test_preds, dim=1)
 preds_t = torch.cat((preds_t, torch.ones_like(preds_t[:, :1])), 1)
-preds_t[:, 5004] = best_th
+preds_t[:, num_classes] = best_th
 #Concat with val
 all_gt0 = torch.cat([val_gt, train_labels], dim=0)
 all_feats0 = torch.cat([val_feats, train_feats], dim=0)
@@ -174,15 +180,16 @@ dm3 = batched_dmv(test_feats, all_feats0)
 cm3 = dm2cm(dm3, all_gt0)
 cm3 = 0.5*(2.0 - cm3)
 preds_ft_0t = cm3.clone().detach()
-preds_ft_0t[:, 5004] = best_th_feats
+preds_ft_0t[:, num_classes] = best_th_feats
 pit1 = thlist[0]*cm3 + thlist[1]*preds_ft_0t+thlist[2]*preds_t
 if SAVE_TEST_MATRIX:
     print ("Saving test feats")
-    torch.save({"test_feats": test_feats.detach().cpu(), 
+    torch.save({"test_feats": test_feats.detach().cpu(),
                 "best_preds": pit1.detach().cpu(),
                 "classes": classes,
                 "thresholds": thresholds,
-                }, name + 'test_feats.pt')    
+                }, 'data/models/' + name + '_test_feats.pt')
+
 try:
     os.makedirs('subs')
 except:
