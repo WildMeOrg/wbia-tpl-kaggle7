@@ -53,7 +53,7 @@ def create_submission(preds, data, name, classes=None):
     sub = pd.DataFrame({'Image': [path.name for path in data.test_ds.x.items]})
     sub['Id'] = top_5_pred_labels(preds, classes)
     sub.to_csv(f'subs/{name}.csv.gz', index=False, compression='gzip')
-    
+
 def find_new_whale_th(preds, targs, num_classes=5004):
     with torch.no_grad():
         if preds.size(1) == num_classes:
@@ -120,7 +120,7 @@ def find_mixing_proportions(sm_preds, sim, sim_th, targs):
                     best_score= score
                     thlist = [c1,c2,c31]
                     out_preds = out_with_feats
-                    
+
     return out_preds, thlist, best_score
 
 def get_predictions(model, val_loader):
@@ -270,7 +270,7 @@ def open_image_grey(fn:PathOrStr, div:bool=True, convert_mode:str='RGB', cls:typ
 class ImageListGray(ImageList):
     def open(self, fn:PathOrStr)->Image:
         return open_image_grey(fn)
-    
+
 def top5acc(preds, targs):
     predicted_idxs = preds.sort(descending=True)[1]
     top_5 = predicted_idxs[:, :5]

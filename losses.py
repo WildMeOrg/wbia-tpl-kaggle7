@@ -36,7 +36,7 @@ class RingLoss(Callback):
                           last_target:Tensor,
                           **kwargs):
         x_list = self.feature_out
-        ring_list = self.learn.model.head.rings
+        ring_list = self.learn.model.module.head.rings
         num_clf = len(ring_list)
         loss = None
         for cc in range(num_clf):
@@ -54,7 +54,7 @@ class RingLoss(Callback):
 @dataclass
 class CenterLoss(Callback):
     "`Callback` that regroups lr adjustment to seq_len, AR and TAR."
-    #Adopted from 
+    #Adopted from
     #https://github.com/KaiyangZhou/pytorch-center-loss/blob/master/center_loss.py
     learn:Learner
     alpha:float=0.5
@@ -72,10 +72,10 @@ class CenterLoss(Callback):
         x_list = self.feature_out
         labels = last_target.clone().detach().cpu()
         batch_size = labels.size(0)
-        num_classes = self.learn.model.head.num_classes
+        num_classes = self.learn.model.module.head.num_classes
         classes = torch.arange(num_classes).long()
         labels = labels.unsqueeze(1).expand(batch_size, num_classes)
-        centers_list = self.learn.model.head.centers
+        centers_list = self.learn.model.module.head.centers
         num_clf = len(centers_list)
         loss = None
         for cc in range(num_clf):
@@ -111,4 +111,3 @@ def MultiCE(x,targs):
         else:
             loss = loss + coef*CrossEntropyFlat()(out, targs)
     return loss
-

@@ -25,5 +25,6 @@ Heavily based on https://github.com/radekosmulski/whale
 docker pull wildme/kaggle7:latest
 
 # Map the local ./data folder into the /data/ folder inside the container (which is symlinked from /opt/whale/data/)
-NV_GPU=1 nvidia-docker container run -it --rm --name kaggle7 -v $(pwd)/data/:/data/ --ipc=host wildme/kaggle7:latest
+NV_GPU=1,3 nvidia-docker container run -it --rm --name kaggle7 -v $(pwd)/data/:/data/ --ipc=host wildme/kaggle7:latest
+NV_GPU=1,3 nvidia-docker container run -it --rm --name kaggle7 -v $(pwd)/data/:/data/ --ipc=host --entrypoint="/bin/bash" wildme/kaggle7:latest
 ```
