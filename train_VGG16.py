@@ -27,7 +27,7 @@ fn2label = {row[1].Image: row[1].Id for row in df.iterrows()}
 path2fn = lambda path: re.search('\w*\.jpg$', path).group(0)
 
 SZ = 384
-BS = 50
+BS = 35
 NUM_WORKERS = 20
 SEED=0
 SAVE_TRAIN_FEATS = False
@@ -62,9 +62,10 @@ class CustomPCBNetwork(nn.Module):
         return out
 
 network_model = CustomPCBNetwork(torchvision.models.vgg16_bn(pretrained=True))
-if torch.cuda.device_count() > 1:
-    print("Using", torch.cuda.device_count(), "GPUs!")
-    network_model = nn.DataParallel(network_model)
+
+# if torch.cuda.device_count() > 1:
+#     print("Using", torch.cuda.device_count(), "GPUs!")
+#     network_model = nn.DataParallel(network_model)
 
 learn = Learner(data, network_model,
                    metrics=[map5ave,map5total],
