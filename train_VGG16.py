@@ -27,7 +27,7 @@ fn2label = {row[1].Image: row[1].Id for row in df.iterrows()}
 path2fn = lambda path: re.search('\w*\.jpg$', path).group(0)
 
 SZ = 384
-BS = 80
+BS = 96
 NUM_WORKERS = 20
 SEED=0
 SAVE_TRAIN_FEATS = False
