@@ -28,7 +28,7 @@ path2fn = lambda path: re.search('\w*\.jpg$', path).group(0)
 
 SZ = 384
 BS = 50
-NUM_WORKERS = 10
+NUM_WORKERS = 20
 SEED=0
 SAVE_TRAIN_FEATS = False
 SAVE_TEST_MATRIX = False
