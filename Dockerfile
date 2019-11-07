@@ -77,11 +77,10 @@ FROM org.wildme.ibeis.pytorch as org.wildme.ibeis.kaggle7
 # Install additional conda dependencies
 RUN conda install -y jupyter notebook \
  && conda install -c conda-forge jupyter_contrib_nbextensions \
- && conda install -c pytorch -c fastai fastai \
  && conda clean -ya
 
 # Install additional PyPI dependencies
-RUN pip install -y pretrainedmodels
+RUN pip install fastai pretrainedmodels
 
 # Pre-download pre-trained VGG-16 model with Batch Norm
 RUN python -c 'import torchvision; torchvision.models.vgg16_bn(pretrained=True)'
@@ -93,7 +92,7 @@ COPY ./*.py /opt/whale/
 RUN mkdir -p /data
 
 # Add symlink to /data
-RUN ln -s /opt/whale/data /data
+RUN ln -s /data /opt/whale/data 
 
 # Set workdir to the main repository for convenience
 WORKDIR /opt/whale/

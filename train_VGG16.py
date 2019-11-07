@@ -27,7 +27,7 @@ fn2label = {row[1].Image: row[1].Id for row in df.iterrows()}
 path2fn = lambda path: re.search('\w*\.jpg$', path).group(0)
 
 SZ = 384
-BS = 20
+BS = 50
 NUM_WORKERS = 10
 SEED=0
 SAVE_TRAIN_FEATS = False
@@ -49,17 +49,24 @@ data = (
         .databunch(bs=BS, num_workers=NUM_WORKERS, path='data')
         .normalize(imagenet_stats)
 )
+
 class CustomPCBNetwork(nn.Module):
     def __init__(self, new_model):
         super().__init__()
         self.cnn =  new_model.features
         self.head = PCBRingHead2(num_classes, 512, 4, 512)
+
     def forward(self, x):
         x = self.cnn(x)
         out = self.head(x)
         return out
 
-learn = Learner(data, CustomPCBNetwork(torchvision.models.vgg16_bn(pretrained=True)),
+network_model = CustomPCBNetwork(torchvision.models.vgg16_bn(pretrained=True))
+if torch.cuda.device_count() > 1:
+    print("Using", torch.cuda.device_count(), "GPUs!")
+    network_model = nn.DataParallel(network_model)
+
+learn = Learner(data, network_model,
                    metrics=[map5ave,map5total],
                    loss_func=MultiCE,
                    callback_fns = [RingLoss])
@@ -109,7 +116,7 @@ y = val_fns.union(new_whale_fns)
 classes = learn.data.classes + ['new_whale']
 data = (
     ImageListGray
-        .from_df(df, 'data/crop_train', cols=['Image']) 
+        .from_df(df, 'data/crop_train', cols=['Image'])
         .split_by_valid_func(lambda path: path2fn(path) in y)
         .label_from_func(lambda path: fn2label[path2fn(path)], classes=classes)
         .add_test(ImageList.from_folder('data/crop_test'))
