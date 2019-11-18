@@ -19,10 +19,12 @@ import torch.nn.functional as F
 from torch.nn.parameter import Parameter
 import torch.nn as nn
 from arch import *
+
 def map5(preds,targs):
     if type(preds) is list:
         return torch.cat([map5fast(p, targs).view(1) for p in preds ]).mean()
     return map5fast(preds,targs)
+
 def map5fast(preds, targs, k =5):
     top_5 = preds.topk(k, 1)[1]
     targs = targs.to(preds.device)

@@ -30,21 +30,23 @@ NV_GPU=1,3 nvidia-docker container run -it --rm --name kaggle7 -v $(pwd)/data/:/
 ```
 
 
-## TO use Flukebook data
+## To use Flukebook data
 
 ```
 wget https://cthulhu.dyn.wildme.io/public/datasets/flukebook.id.fluke.encounters.tar.gz
 rm -rf flukebook.id.fluke.encounters/
 targzx flukebook.id.fluke.encounters.tar.gz
-mkdir -p data_flukebook
-mkdir -p data_flukebook/train
-mkdir -p data_flukebook/test
-cp -R flukebook.id.fluke.encounters/train/manifest/ data_flukebook/train/
-cp -R flukebook.id.fluke.encounters/test/manifest/ data_flukebook/test/
-cp -R flukebook.id.fluke.encounters/train.txt data_flukebook/train.txt
-cp -R flukebook.id.fluke.encounters/test.txt data_flukebook/test.txt
+mv data/ data_OLD/
+rm -rf data/
+mkdir -p data/
+mkdir -p data/train/
+mkdir -p data/test/
+cp -R flukebook.id.fluke.encounters/train/manifest/*.jpg data/train/
+cp -R flukebook.id.fluke.encounters/test/manifest/*.jpg data/train/
+cp -R flukebook.id.fluke.encounters/test/manifest/*.jpg data/test/
+cp -R flukebook.id.fluke.encounters/train.txt data/train.txt
+cp -R flukebook.id.fluke.encounters/test.txt data/test.txt
 
-mv data/ data_old/
-mv data_flukebook/ data/
 python add_bboxes_and_val_fns_and_sample_submission.py
+python apply_bboxes.py
 ```

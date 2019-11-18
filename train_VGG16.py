@@ -24,7 +24,7 @@ df = pd.read_csv('data/train.csv')
 val_fns = pd.read_pickle('data/val_fns')
 
 fn2label = {row[1].Image: row[1].Id for row in df.iterrows()}
-path2fn = lambda path: re.search('\w*\.jpg$', path).group(0)
+path2fn = lambda path: re.search('[\w-]*\.jpg$', path).group(0)
 
 SZ = 384
 BS = 112

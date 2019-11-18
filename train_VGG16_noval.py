@@ -23,7 +23,7 @@ df = pd.read_csv('data/train.csv')
 #val_fns = pd.read_pickle('data/val_fns')
 val_fns = ['69823499d.jpg']
 fn2label = {row[1].Image: row[1].Id for row in df.iterrows()}
-path2fn = lambda path: re.search('\w*\.jpg$', path).group(0)
+path2fn = lambda path: re.search('[\w-]*\.jpg$', path).group(0)
 
 SZ = 384
 BS = 20
@@ -149,4 +149,3 @@ if SAVE_TEST_MATRIX:
                 "train_labels": train_labels.detach().cpu(),
                 "train_feats": train_feats.detach().cpu(),
                 }, name + 'test_feats.pt')
-
