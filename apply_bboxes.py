@@ -22,7 +22,7 @@ try:
     os.makedirs('data/crop_test')
 except:
     pass
-    
+
 t=time()
 for i in range(len(df)):
     fn = os.path.join('data/train', df.Image[i])
