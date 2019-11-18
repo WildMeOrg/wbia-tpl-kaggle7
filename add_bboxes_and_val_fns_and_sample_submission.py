@@ -53,3 +53,9 @@ df = pd.DataFrame(test_data, columns=columns)
 with open('data/sample_submission.csv', 'w') as csv_file:
     csv_str = df.to_csv(index=False)
     csv_file.write(csv_str)
+
+df = pd.read_csv('data/train.txt')
+df = df.drop(columns=['Unixtime'])
+with open('data/train.csv', 'w') as csv_file:
+    csv_str = df.to_csv(index=False)
+    csv_file.write(csv_str)
