@@ -151,8 +151,8 @@ class_sims_th, best_th_feats, score_feats_th = find_new_whale_th(class_sims, tar
 out_preds, thlist, best_score = find_mixing_proportions(best_preds,
                                                        class_sims,
                                                       class_sims_th,targs)
-out_preds = out_preds.to(device)
-targs = targs.to(device)
+out_preds = out_preds.to(get_device())
+targs = targs.to(get_device())
 print ("Best mix score = ", best_score)
 print ("Val top1 acc = ", accuracy(out_preds, targs).cpu().item())
 print ("Val map5 = ",map5(out_preds, targs).cpu().item())
