@@ -17,6 +17,7 @@ from arch import *
 from utils import *
 from losses import *
 import torchvision
+import os
 
 print("torch.cuda.is_available:", torch.cuda.is_available())
 
@@ -26,57 +27,90 @@ val_fns = pd.read_pickle('data/val_fns')
 fn2label = {row[1].Image: row[1].Id for row in df.iterrows()}
 path2fn = lambda path: re.search('[\w-]*\.jpg$', path).group(0)
 
-SZ = 384
-BS = 112
-NUM_WORKERS = 20
-SEED=0
-SAVE_TRAIN_FEATS = False
-SAVE_TEST_MATRIX = False
+SZ = 512
+BS = 16
+NUM_WORKERS = 10
+SEED = 0
+SAVE_TRAIN_FEATS = True
+SAVE_TEST_MATRIX = True
 LOAD_IF_CAN = True
 
-num_classes = 5004
-num_epochs = 100
+num_classes = 1571
+num_epochs = 50
 
-name = f'VGG16-GeMConst-bbox-PCB4-{SZ}-val-Ring-CELU'
+name = f'DenseNet201-GeM-PCB8-{SZ}-Ring-RELU'
+
+tfms = (
+    [
+        RandTransform(tfm=symmetric_warp, kwargs={'magnitude': (-0.3, 0.3)}),
+        RandTransform(tfm=rotate, kwargs={'degrees': (-15.0, 15.0)}),
+        RandTransform(tfm=zoom, kwargs={'scale': (0.9, 1.1), 'row_pct': (0, 1), 'col_pct': (0, 1)}),
+        RandTransform(tfm=brightness, kwargs={'change': (0.3, 0.7)}),
+        RandTransform(tfm=contrast, kwargs={'scale': (0.7, 1.3)}),
+    ],
+    []
+)
+
+if not os.path.exists('data/augmentations'):
+    os.mkdir('data/augmentations')
+
+for index in range(len(df.Image)):
+    if index > 10:
+        break
+    filename = df.Image[index]
+    basename, ext = os.path.splitext(filename)
+    path = os.path.join('data/crop_train', filename)
+    # image = open_image_grey(path)
+    image = open_image(path)
+    print(path)
+    print(image)
+    image_ = image.apply_tfms(tfms[0], size=SZ, resize_method=ResizeMethod.SQUISH, padding_mode='reflection')
+    image.save('data/augmentations/%s_original%s' % (basename, ext, ))
+    image_.save('data/augmentations/%s_augmented%s' % (basename, ext, ))
 
 data = (
     ImageListGray
-        .from_df(df[df.Id != 'new_whale'], 'data/crop_train', cols=['Image'])
-        .split_by_valid_func(lambda path: path2fn(path) in val_fns)
-        .label_from_func(lambda path: fn2label[path2fn(path)])
-        .add_test(ImageList.from_folder('data/crop_test'))
-        .transform(get_transforms(do_flip=False), size=SZ, resize_method=ResizeMethod.SQUISH)
-        .databunch(bs=BS, num_workers=NUM_WORKERS, path='data')
-        .normalize(imagenet_stats)
+    .from_df(df[df.Id != 'new_whale'], 'data/crop_train', cols=['Image'])
+    .split_by_valid_func(lambda path: path2fn(path) in val_fns)
+    .label_from_func(lambda path: fn2label[path2fn(path)])
+    .add_test(ImageList.from_folder('data/crop_test'))
+    .transform(tfms, size=SZ, resize_method=ResizeMethod.SQUISH, padding_mode='reflection')
+    .databunch(bs=BS, num_workers=NUM_WORKERS, path='data')
+    .normalize(imagenet_stats)
 )
+
 
 class CustomPCBNetwork(nn.Module):
     def __init__(self, new_model):
         super().__init__()
         self.cnn =  new_model.features
-        self.head = PCBRingHead2(num_classes, 512, 4, 512)
+        self.head = PCBRingHead2(num_classes, 128, 8, 1920)
 
     def forward(self, x):
         x = self.cnn(x)
         out = self.head(x)
         return out
 
-network_model = CustomPCBNetwork(torchvision.models.vgg16_bn(pretrained=True))
+network_model = CustomPCBNetwork(torchvision.models.densenet201(pretrained=True))
 
 if torch.cuda.device_count() > 1:
     print("Using", torch.cuda.device_count(), "GPUs!")
     network_model = nn.DataParallel(network_model)
 
 learn = Learner(data, network_model,
-                   metrics=[map5ave,map5total],
+                   metrics=[map1total, map5total, map12total],
                    loss_func=MultiCE,
-                   callback_fns = [RingLoss])
-learn.split([learn.model.module.cnn[26], learn.model.module.head])
+                   callback_fns=[RingLoss])
+
+learn.lr_find()
+
+learn.split([learn.model.module.cnn, learn.model.module.head])
 learn.freeze()
 learn.clip_grad()
 
 LOADED = False
 print ("Stage one, training only head")
+max_lr = 5e-2
 if LOAD_IF_CAN:
     try:
         learn.load(name)
@@ -84,25 +118,28 @@ if LOAD_IF_CAN:
     except:
         LOADED = False
 if not LOADED:
-    learn.fit_one_cycle(num_epochs, 1e-2/1.5)#6.7e-3
+    learn.fit_one_cycle(num_epochs,         max_lr)
+    learn.fit_one_cycle(num_epochs * 2,     max_lr)
+    learn.fit_one_cycle(num_epochs * 2 * 2, max_lr)
     learn.save(name)
 print ('Stage 1 done, finetuning everything')
 
 learn.unfreeze()
-max_lr = 2e-3
-lrs = [max_lr/10., max_lr, max_lr]
 
 LOADED = False
 if LOAD_IF_CAN:
     try:
-        learn.load(name+ '_unfreeze')
+        learn.load(name + '_unfreeze')
         LOADED = True
     except:
         LOADED = False
 
 if not LOADED:
-    learn.fit_one_cycle(num_epochs, lrs)
+    learn.fit_one_cycle(num_epochs,         max_lr)
+    learn.fit_one_cycle(num_epochs * 2,     max_lr)
+    learn.fit_one_cycle(num_epochs * 2 * 2, max_lr)
     learn.save(name + '_unfreeze')
+
 print ("Stage 2 done, starting stage 3")
 
 LOADED = False
@@ -156,7 +193,7 @@ targs = targs.to(get_device())
 print ("Best mix score = ", best_score)
 print ("Val top1 acc = ", accuracy(out_preds, targs).cpu().item())
 print ("Val map5 = ",map5(out_preds, targs).cpu().item())
-print ("Val top5 acc = ",top5acc(out_preds, targs).cpu().item())
+print ("Val top5 acc = ",topkacc(out_preds, targs, k=5).cpu().item())
 thresholds = {}
 thresholds['softmax'] = best_sm_th
 thresholds['preds_th'] = best_th

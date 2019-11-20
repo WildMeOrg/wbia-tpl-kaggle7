@@ -95,19 +95,20 @@ class CenterLoss(Callback):
                 loss = dist.mean()
             else:
                 loss = loss + dist.mean()
-        if self.alpha != 0.:  last_loss += (self.alpha * loss).sum()
+        if self.alpha != 0.:
+            last_loss += (self.alpha * loss).sum()
         return {'last_loss': last_loss}
 
 def MultiCE(x,targs):
     loss = None
     l = list(x)
-    coef = 1.0#0.25
+    coef = 0.5 # 1.0 # 0.25
     for i in range(len(l)):
         out = l[i]
-        if i == len(l)-1:
-            coef = 1.0
+        # if i == len(l)-1:
+        #     coef = 1.0
         if loss is None:
-            loss = coef * CrossEntropyFlat()(out, targs)
+            loss = CrossEntropyFlat()(out, targs)
         else:
-            loss = loss + coef*CrossEntropyFlat()(out, targs)
+            loss = (1.0 - coef) * loss + (coef) * CrossEntropyFlat()(out, targs)
     return loss

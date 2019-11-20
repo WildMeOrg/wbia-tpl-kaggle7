@@ -24,6 +24,7 @@ def get_device():
 
 def gem(x, p=3, eps=1e-5):
     return torch.abs(F.avg_pool2d(x.clamp(min=eps, max=1e4).pow(p), (x.size(-2), x.size(-1))).pow(1./p))
+
 class L2Norm(nn.Module):
     def __init__(self):
         super(L2Norm,self).__init__()
@@ -43,8 +44,6 @@ class GeM(nn.Module):
     def __repr__(self):
         return self.__class__.__name__ + '(' + 'p=' + '{:.4f}'.format(self.p.data.tolist()[0]) + ', ' + 'eps=' + str(self.eps) + ')'
 
-
-
 class GeMConst(nn.Module):
 
     def __init__(self, p=3.74, eps=1e-6):
@@ -58,6 +57,7 @@ class GeMConst(nn.Module):
     def __repr__(self):
         return self.__class__.__name__ + '(' + 'p=' + '{:.4f}'.format(self.p) + ', ' + 'eps=' + str(
             self.eps) + ')'
+
 class L2Norm(nn.Module):
     def __init__(self):
         super(L2Norm,self).__init__()
@@ -68,7 +68,7 @@ class L2Norm(nn.Module):
         return x
 
 class PCBRingHead2(nn.Module):
-    def __init__(self, num_classes, feat_dim, num_clf = 4, in_feat = 2048, r_init =1.5):
+    def __init__(self, num_classes, feat_dim, num_clf=4, in_feat=2048, r_init=1.5):
         super(PCBRingHead2,self).__init__()
         self.eps = 1e-10
         self.num_classes = num_classes
@@ -76,25 +76,34 @@ class PCBRingHead2(nn.Module):
         self.num_clf = num_clf
         self.local_FE_list = nn.ModuleList()
         self.rings =  nn.ParameterList()
-        self.total_clf = nn.Sequential( nn.Dropout(p=0.5),
-                                      nn.Linear(in_features=feat_dim*num_clf,
-                                                out_features=num_classes, bias=True))
+        self.total_clf = nn.Sequential(
+            nn.Dropout(p=0.5),
+            nn.Linear(in_features=feat_dim*num_clf, out_features=num_classes, bias=True)
+        )
+
         for i in range(num_clf):
             self.rings.append(nn.Parameter(torch.ones(1).to(get_device())*r_init))
         for i in range(num_clf):
-            self.local_FE_list.append(nn.Sequential(GeMConst(3.74), Flatten(),
-                        nn.BatchNorm1d(in_feat, eps=1e-05, momentum=0.1,
-                                                       affine=True, track_running_stats=True),
-                        nn.Dropout(p=0.3),
-                        nn.Linear(in_features=in_feat, out_features=feat_dim, bias=True),
-                        nn.CELU(inplace=True),
-                        nn.BatchNorm1d(feat_dim,eps=1e-05, momentum=0.1,
-                                                       affine=True, track_running_stats=True)
-                        ))
+            self.local_FE_list.append(
+                nn.Sequential(
+                    # GeMConst(3.74),
+                    GeM(),
+                    Flatten(),
+                    nn.BatchNorm1d(in_feat, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
+                    nn.Dropout(p=0.5),
+                    nn.Linear(in_features=in_feat, out_features=feat_dim, bias=True),
+                    nn.ReLU(inplace=True),
+                    nn.BatchNorm1d(feat_dim, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+                )
+            )
         self.local_clf_list = nn.ModuleList()
         for i in range(num_clf):
-            self.local_clf_list.append(nn.Sequential( nn.Dropout(p=0.5),
-                                      nn.Linear(in_features=feat_dim, out_features=num_classes, bias=True)))
+            self.local_clf_list.append(
+                nn.Sequential(
+                    nn.Dropout(p=0.5),
+                    nn.Linear(in_features=feat_dim, out_features=num_classes, bias=True)
+                )
+            )
     def forward(self, x):
         assert x.size(3) % self.num_clf == 0
         stripe_w = int(x.size(2) // self.num_clf)
