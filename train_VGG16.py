@@ -102,19 +102,8 @@ learn = Learner(data, network_model,
                    loss_func=MultiCE,
                    callback_fns=[RingLoss])
 
-out = network_model.module.cnn(torch.rand(1,3,660,660).to(get_device()))
-print(out.shape)
-
-in_feat = 1920
-dense_blocks = make_new_densenet_block(in_feat).to(get_device())
-out = dense_blocks(torch.rand(1,1920,20,5).to(get_device()))
-print(out.shape)
-
-# Find max_lr
-learn.lr_find()
-values = sorted(zip(learn.recorder.losses, learn.recorder.lrs))
-max_lr = values[0][1]
-max_lr /= 10.0
+# out = network_model.module.cnn(torch.rand(1,3,SZ,SZ).to(get_device()))
+# print(out.shape)
 
 learn.split([learn.model.module.cnn, learn.model.module.head])
 learn.freeze()
@@ -129,9 +118,19 @@ if LOAD_IF_CAN:
     except:
         LOADED = False
 if not LOADED:
-    learn.fit_one_cycle(num_epochs,         max_lr)
-    learn.fit_one_cycle(num_epochs * 2,     max_lr)
-    learn.fit_one_cycle(num_epochs * 2 * 2, max_lr)
+    num_epochs_ = num_epochs
+    for round_num in range(3):
+        print ("Stage one, round %d training" % (round_num + 1, ))
+
+        # Find max_lr
+        learn.lr_find()
+        values = sorted(zip(learn.recorder.losses, learn.recorder.lrs))
+        max_lr = values[0][1]
+        max_lr /= 10.0
+
+        # Train
+        learn.fit_one_cycle(num_epochs_, max_lr)
+        num_epochs_ *= 2
     learn.save(name)
 print ('Stage 1 done, finetuning everything')
 
@@ -146,9 +145,19 @@ if LOAD_IF_CAN:
         LOADED = False
 
 if not LOADED:
-    learn.fit_one_cycle(num_epochs,         max_lr)
-    learn.fit_one_cycle(num_epochs * 2,     max_lr)
-    learn.fit_one_cycle(num_epochs * 2 * 2, max_lr)
+    num_epochs_ = num_epochs
+    for round_num in range(3):
+        print ("Stage two, round %d training" % (round_num + 1, ))
+
+        # Find max_lr
+        learn.lr_find()
+        values = sorted(zip(learn.recorder.losses, learn.recorder.lrs))
+        max_lr = values[0][1]
+        max_lr /= 10.0
+
+        # Train
+        learn.fit_one_cycle(num_epochs_, max_lr)
+        num_epochs_ *= 2
     learn.save(name + '_unfreeze')
 
 print ("Stage 2 done, starting stage 3")
