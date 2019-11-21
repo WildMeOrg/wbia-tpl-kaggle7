@@ -28,7 +28,7 @@ fn2label = {row[1].Image: row[1].Id for row in df.iterrows()}
 path2fn = lambda path: re.search('[\w-]*\.jpg$', path).group(0)
 
 SZ = 660
-BS = 16
+BS = 24
 NUM_WORKERS = 10
 SEED = 0
 SAVE_TRAIN_FEATS = True
@@ -95,20 +95,20 @@ class CustomPCBNetwork(nn.Module):
 
 network_model = CustomPCBNetwork(torchvision.models.densenet201(pretrained=True))
 
+if torch.cuda.device_count() > 1:
+    print("Using", torch.cuda.device_count(), "GPUs!")
+    network_model = nn.DataParallel(network_model)
+
 learn = Learner(data, network_model,
                    metrics=[map1total, map5total, map12total],
                    loss_func=MultiCE,
                    callback_fns=[RingLoss])
 
-input_ = torch.rand(1,3,SZ,SZ).to(get_device())
-x = network_model.module.cnn(input_)
-y = network_model.module.head(x)
-print(out.shape)
-
 learn.split([learn.model.module.cnn, learn.model.module.head])
 learn.freeze()
 learn.clip_grad()
 
+min_max_lr = 5e-4
 LOADED = False
 print ("Stage one, training only head")
 if LOAD_IF_CAN:
@@ -126,10 +126,12 @@ if not LOADED:
         learn.lr_find()
         values = sorted(zip(learn.recorder.losses, learn.recorder.lrs))
         max_lr = values[0][1]
-        max_lr /= 10.0
-
+        max_lr_ = max_lr / 10.0
+        if round_num == 0:
+            max_lr_ = max(max_lr_, min_max_lr)
+        print('Found max_lr = %0.08f, using %0.08f' % (max_lr, max_lr_))
         # Train
-        learn.fit_one_cycle(num_epochs_, max_lr)
+        learn.fit_one_cycle(num_epochs_, max_lr_)
         num_epochs_ *= 2
     learn.save(name)
 print ('Stage 1 done, finetuning everything')
