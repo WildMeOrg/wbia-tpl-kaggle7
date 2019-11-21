@@ -112,6 +112,7 @@ class PCBRingHead2(nn.Module):
         self.num_clf = num_clf
         self.local_FE_list = nn.ModuleList()
         self.rings =  nn.ParameterList()
+
         self.total_clf = nn.Sequential(
             nn.Dropout(p=0.5),
             nn.Linear(in_features=feat_dim*num_clf, out_features=num_classes, bias=True)
