@@ -75,7 +75,7 @@ def make_new_densenet_block(in_feat):
     # Each denseblock
     num_features = in_feat
     block_config = (6, 8, 6)
-    growth_rate = 1
+    growth_rate = 16
     bn_size = 4
     drop_rate = 0.5
     memory_efficient = False
@@ -123,7 +123,7 @@ class PCBRingHead2(nn.Module):
 
         for i in range(num_clf):
             assert in_feat == 1920
-            in_feat_ = 128 * 5 * 1
+            in_feat_ = 254
 
             dense_blocks = make_new_densenet_block(in_feat).to(get_device())
             self.local_FE_list.append(

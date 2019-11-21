@@ -56,17 +56,18 @@ if not os.path.exists('data/augmentations'):
 
 print('Exporting Augmentations:')
 for index in range(len(df.Image)):
+    if index > 10:
+        break
+    filename = df.Image[index]
+    basename, ext = os.path.splitext(filename)
+    path = os.path.join('data/crop_train', filename)
+    # image = open_image_grey(path)
+    image = open_image(path)
+    print('\t', path, image)
+
+    image.save('data/augmentations/%s_original%s' % (basename, ext, ))
     for version in range(5):
-        if index > 10:
-            break
-        filename = df.Image[index]
-        basename, ext = os.path.splitext(filename)
-        path = os.path.join('data/crop_train', filename)
-        # image = open_image_grey(path)
-        image = open_image(path)
-        print('\t', path, image)
         image_ = image.apply_tfms(tfms[0], size=SZ, resize_method=ResizeMethod.SQUISH, padding_mode='reflection')
-        image.save('data/augmentations/%s_original%s' % (basename, ext, ))
         image_.save('data/augmentations/%s_augmented_%d%s' % (basename, version, ext, ))
 
 data = (
@@ -85,7 +86,7 @@ class CustomPCBNetwork(nn.Module):
     def __init__(self, new_model):
         super().__init__()
         self.cnn =  new_model.features
-        self.head = PCBRingHead2(num_classes, 320, 4, 1920)
+        self.head = PCBRingHead2(num_classes, 256, 4, 1920)
 
     def forward(self, x):
         x = self.cnn(x)
@@ -94,17 +95,15 @@ class CustomPCBNetwork(nn.Module):
 
 network_model = CustomPCBNetwork(torchvision.models.densenet201(pretrained=True))
 
-if torch.cuda.device_count() > 1:
-    print("Using", torch.cuda.device_count(), "GPUs!")
-    network_model = nn.DataParallel(network_model)
-
 learn = Learner(data, network_model,
                    metrics=[map1total, map5total, map12total],
                    loss_func=MultiCE,
                    callback_fns=[RingLoss])
 
-# out = network_model.module.cnn(torch.rand(1,3,SZ,SZ).to(get_device()))
-# print(out.shape)
+input_ = torch.rand(1,3,SZ,SZ).to(get_device())
+x = network_model.module.cnn(input_)
+y = network_model.module.head(x)
+print(out.shape)
 
 learn.split([learn.model.module.cnn, learn.model.module.head])
 learn.freeze()

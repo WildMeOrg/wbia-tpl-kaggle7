@@ -83,7 +83,7 @@ RUN conda install -y jupyter notebook \
 RUN pip install fastai pretrainedmodels
 
 # Pre-download pre-trained VGG-16 model with Batch Norm
-RUN python -c 'import torchvision; torchvision.models.vgg16_bn(pretrained=True)'
+RUN python -c 'import torchvision; torchvision.models.densenet201(pretrained=True)'
 
 # Copy local Python code from repo into container
 COPY ./*.py /opt/whale/
