@@ -67,6 +67,42 @@ class L2Norm(nn.Module):
         x= x / norm.unsqueeze(-1).expand_as(x)
         return x
 
+
+def make_new_densenet_block(in_feat):
+    dense_blocks = nn.Sequential()
+
+    # Each denseblock
+    num_features = in_feat
+    block_config = (6, 8, 6)
+    growth_rate = 1
+    bn_size = 4
+    drop_rate = 0.0
+    memory_efficient = False
+    for i, num_layers in enumerate(block_config):
+        block = torchvision.models.densenet._DenseBlock(
+            num_layers=num_layers,
+            num_input_features=num_features,
+            bn_size=bn_size,
+            growth_rate=growth_rate,
+            drop_rate=drop_rate,
+            memory_efficient=memory_efficient
+        )
+        dense_blocks.add_module('top_denseblock%d' % (i + 1), block)
+        num_features = num_features + num_layers * growth_rate
+        print(num_features)
+        if i != len(block_config) - 1:
+            trans = torchvision.models.densenet._Transition(
+                num_input_features=num_features,
+                num_output_features=num_features // 4
+            )
+            dense_blocks.add_module('top_transition%d' % (i + 1), trans)
+            num_features = num_features // 4
+
+    # Final batch norm
+    dense_blocks.add_module('top_norm5', nn.BatchNorm2d(num_features))
+    return dense_blocks
+
+
 class PCBRingHead2(nn.Module):
     def __init__(self, num_classes, feat_dim, num_clf=4, in_feat=2048, r_init=1.5):
         super(PCBRingHead2,self).__init__()
@@ -84,14 +120,18 @@ class PCBRingHead2(nn.Module):
         for i in range(num_clf):
             self.rings.append(nn.Parameter(torch.ones(1).to(get_device())*r_init))
         for i in range(num_clf):
+            assert in_feat == 1920
+            dense_blocks = make_new_densenet_block(in_feat).to(get_device())
+            in_feat_ = 128 * 5 * 5
             self.local_FE_list.append(
                 nn.Sequential(
+                    dense_blocks,
                     # GeMConst(3.74),
                     GeM(),
                     Flatten(),
-                    nn.BatchNorm1d(in_feat, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
+                    nn.BatchNorm1d(in_feat_, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
                     nn.Dropout(p=0.5),
-                    nn.Linear(in_features=in_feat, out_features=feat_dim, bias=True),
+                    nn.Linear(in_features=in_feat_, out_features=feat_dim, bias=True),
                     nn.ReLU(inplace=True),
                     nn.BatchNorm1d(feat_dim, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
                 )

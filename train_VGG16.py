@@ -27,26 +27,26 @@ val_fns = pd.read_pickle('data/val_fns')
 fn2label = {row[1].Image: row[1].Id for row in df.iterrows()}
 path2fn = lambda path: re.search('[\w-]*\.jpg$', path).group(0)
 
-SZ = 512
-BS = 16
+SZ = 760
+BS = 64
 NUM_WORKERS = 10
 SEED = 0
 SAVE_TRAIN_FEATS = True
 SAVE_TEST_MATRIX = True
 LOAD_IF_CAN = True
 
-num_classes = 1571
+num_classes = len(set(df.Id))  # 1571
 num_epochs = 50
 
 name = f'DenseNet201-GeM-PCB8-{SZ}-Ring-RELU'
 
 tfms = (
     [
-        RandTransform(tfm=symmetric_warp, kwargs={'magnitude': (-0.3, 0.3)}),
+        RandTransform(tfm=perspective_warp, kwargs={'magnitude': (-0.2, 0.2)}),
         RandTransform(tfm=rotate, kwargs={'degrees': (-15.0, 15.0)}),
         RandTransform(tfm=zoom, kwargs={'scale': (0.9, 1.1), 'row_pct': (0, 1), 'col_pct': (0, 1)}),
         RandTransform(tfm=brightness, kwargs={'change': (0.3, 0.7)}),
-        RandTransform(tfm=contrast, kwargs={'scale': (0.7, 1.3)}),
+        RandTransform(tfm=contrast, kwargs={'scale': (0.5, 1.5)}),
     ],
     []
 )
@@ -84,7 +84,7 @@ class CustomPCBNetwork(nn.Module):
     def __init__(self, new_model):
         super().__init__()
         self.cnn =  new_model.features
-        self.head = PCBRingHead2(num_classes, 128, 8, 1920)
+        self.head = PCBRingHead2(num_classes, 800, 4, 1920)
 
     def forward(self, x):
         x = self.cnn(x)
@@ -102,7 +102,14 @@ learn = Learner(data, network_model,
                    loss_func=MultiCE,
                    callback_fns=[RingLoss])
 
+# network_model = cnn(torch.rand(1,3,SZ,SZ).to(get_device()))
+# print(out.shape)
+
+# Find max_lr
 learn.lr_find()
+values = sorted(zip(learn.recorder.losses, learn.recorder.lrs))
+max_lr = values[0][1]
+max_lr /= 10.0
 
 learn.split([learn.model.module.cnn, learn.model.module.head])
 learn.freeze()
@@ -110,7 +117,6 @@ learn.clip_grad()
 
 LOADED = False
 print ("Stage one, training only head")
-max_lr = 5e-2
 if LOAD_IF_CAN:
     try:
         learn.load(name)
