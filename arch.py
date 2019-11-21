@@ -77,7 +77,7 @@ def make_new_densenet_block(in_feat):
     block_config = (6, 8, 6)
     growth_rate = 1
     bn_size = 4
-    drop_rate = 0.0
+    drop_rate = 0.5
     memory_efficient = False
     for i, num_layers in enumerate(block_config):
         block = torchvision.models.densenet._DenseBlock(

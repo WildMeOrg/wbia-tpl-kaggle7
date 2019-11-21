@@ -42,10 +42,10 @@ name = f'DenseNet201-GeM-PCB8-{SZ}-Ring-RELU'
 
 tfms = (
     [
-        RandTransform(tfm=perspective_warp, kwargs={'magnitude': (-0.2, 0.2)}),
-        RandTransform(tfm=rotate, kwargs={'degrees': (-15.0, 15.0)}),
+        RandTransform(tfm=symmetric_warp, kwargs={'magnitude': (-0.2, 0.2)}),
+        RandTransform(tfm=rotate, kwargs={'degrees': (-20.0, 20.0)}),
         RandTransform(tfm=zoom, kwargs={'scale': (0.9, 1.1), 'row_pct': (0, 1), 'col_pct': (0, 1)}),
-        RandTransform(tfm=brightness, kwargs={'change': (0.3, 0.7)}),
+        RandTransform(tfm=brightness, kwargs={'change': (0.2, 0.8)}),
         RandTransform(tfm=contrast, kwargs={'scale': (0.5, 1.5)}),
     ],
     []
@@ -54,19 +54,20 @@ tfms = (
 if not os.path.exists('data/augmentations'):
     os.mkdir('data/augmentations')
 
+print('Exporting Augmentations:')
 for index in range(len(df.Image)):
-    if index > 10:
-        break
-    filename = df.Image[index]
-    basename, ext = os.path.splitext(filename)
-    path = os.path.join('data/crop_train', filename)
-    # image = open_image_grey(path)
-    image = open_image(path)
-    print(path)
-    print(image)
-    image_ = image.apply_tfms(tfms[0], size=SZ, resize_method=ResizeMethod.SQUISH, padding_mode='reflection')
-    image.save('data/augmentations/%s_original%s' % (basename, ext, ))
-    image_.save('data/augmentations/%s_augmented%s' % (basename, ext, ))
+    for version in range(5):
+        if index > 10:
+            break
+        filename = df.Image[index]
+        basename, ext = os.path.splitext(filename)
+        path = os.path.join('data/crop_train', filename)
+        # image = open_image_grey(path)
+        image = open_image(path)
+        print('\t', path, image)
+        image_ = image.apply_tfms(tfms[0], size=SZ, resize_method=ResizeMethod.SQUISH, padding_mode='reflection')
+        image.save('data/augmentations/%s_original%s' % (basename, ext, ))
+        image_.save('data/augmentations/%s_augmented_%d%s' % (basename, version, ext, ))
 
 data = (
     ImageListGray
