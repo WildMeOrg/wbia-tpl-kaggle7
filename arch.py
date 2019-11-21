@@ -18,6 +18,7 @@ import pandas as pd
 import torch.nn.functional as F
 from torch.nn.parameter import Parameter
 import torch.nn as nn
+import torchvision
 
 def get_device():
     return torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -89,7 +90,6 @@ def make_new_densenet_block(in_feat):
         )
         dense_blocks.add_module('top_denseblock%d' % (i + 1), block)
         num_features = num_features + num_layers * growth_rate
-        print(num_features)
         if i != len(block_config) - 1:
             trans = torchvision.models.densenet._Transition(
                 num_input_features=num_features,
@@ -119,10 +119,12 @@ class PCBRingHead2(nn.Module):
 
         for i in range(num_clf):
             self.rings.append(nn.Parameter(torch.ones(1).to(get_device())*r_init))
+
         for i in range(num_clf):
             assert in_feat == 1920
+            in_feat_ = 128 * 5 * 1
+
             dense_blocks = make_new_densenet_block(in_feat).to(get_device())
-            in_feat_ = 128 * 5 * 5
             self.local_FE_list.append(
                 nn.Sequential(
                     dense_blocks,
@@ -136,6 +138,7 @@ class PCBRingHead2(nn.Module):
                     nn.BatchNorm1d(feat_dim, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
                 )
             )
+
         self.local_clf_list = nn.ModuleList()
         for i in range(num_clf):
             self.local_clf_list.append(

@@ -27,8 +27,8 @@ val_fns = pd.read_pickle('data/val_fns')
 fn2label = {row[1].Image: row[1].Id for row in df.iterrows()}
 path2fn = lambda path: re.search('[\w-]*\.jpg$', path).group(0)
 
-SZ = 760
-BS = 64
+SZ = 660
+BS = 16
 NUM_WORKERS = 10
 SEED = 0
 SAVE_TRAIN_FEATS = True
@@ -84,7 +84,7 @@ class CustomPCBNetwork(nn.Module):
     def __init__(self, new_model):
         super().__init__()
         self.cnn =  new_model.features
-        self.head = PCBRingHead2(num_classes, 800, 4, 1920)
+        self.head = PCBRingHead2(num_classes, 320, 4, 1920)
 
     def forward(self, x):
         x = self.cnn(x)
@@ -102,8 +102,13 @@ learn = Learner(data, network_model,
                    loss_func=MultiCE,
                    callback_fns=[RingLoss])
 
-# network_model = cnn(torch.rand(1,3,SZ,SZ).to(get_device()))
-# print(out.shape)
+out = network_model.module.cnn(torch.rand(1,3,660,660).to(get_device()))
+print(out.shape)
+
+in_feat = 1920
+dense_blocks = make_new_densenet_block(in_feat).to(get_device())
+out = dense_blocks(torch.rand(1,1920,20,5).to(get_device()))
+print(out.shape)
 
 # Find max_lr
 learn.lr_find()

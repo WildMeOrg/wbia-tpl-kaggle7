@@ -19,7 +19,6 @@ import torch.nn.functional as F
 from torch.nn.parameter import Parameter
 import torch.nn as nn
 from arch import *
-import torchvision
 
 
 def mapk(preds, targs, k=5):
