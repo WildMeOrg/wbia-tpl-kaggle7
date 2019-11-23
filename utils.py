@@ -292,10 +292,12 @@ class ImageListGray(ImageList):
         # return open_image(fn)
 
 
-def topkacc(preds, targs, k=5):
+def topkacc(preds, targs, k=5, mean=True):
     predicted_idxs = preds.sort(descending=True)[1]
     top_k = predicted_idxs[:, :k]
-    res = (targs.unsqueeze(1).expand_as(top_k) == top_k).float().max(dim=1)[0].mean()
+    res = (targs.unsqueeze(1).expand_as(top_k) == top_k).float().max(dim=1)[0]
+    if mean:
+        res = res.mean()
     return res
 
 

@@ -17,6 +17,7 @@ from arch import *
 from utils import *
 from losses import *
 import torchvision
+import utool as ut
 import os
 
 print("torch.cuda.is_available:", torch.cuda.is_available())
@@ -43,8 +44,8 @@ tfms = (
     [
         RandTransform(tfm=brightness, kwargs={'change': (0.2, 0.8)}),
         RandTransform(tfm=contrast, kwargs={'scale': (0.5, 1.5)}),
-        RandTransform(tfm=symmetric_warp, kwargs={'magnitude': (-0.1, 0.1)}),
-        RandTransform(tfm=flip_lr, kwargs={}, p=0.5),
+        RandTransform(tfm=symmetric_warp, kwargs={'magnitude': (-0.05, 0.05)}),
+        # RandTransform(tfm=flip_lr, kwargs={}, p=0.5),
         # RandTransform(tfm=rotate, kwargs={'degrees': (-5.0, 5.0)}),
         # RandTransform(tfm=zoom, kwargs={'scale': (0.9, 1.1), 'row_pct': (0, 1), 'col_pct': (0, 1)}),
     ],
@@ -67,7 +68,19 @@ for index in range(len(df.Image)):
 
     image.save('data/augmentations/%s_original%s' % (basename, ext, ))
     for version in range(5):
-        image_ = image.apply_tfms(tfms[0], size=(SZH, SZW), resize_method=ResizeMethod.SQUISH, padding_mode='reflection')
+        image_ = image.apply_tfms(tfms[0], size=(SZH, SZW), resize_method=ResizeMethod.SQUISH, padding_mode='zeros')
+        c, h, w = image_.shape
+        w_ = w // 4
+        for offset in [-1, 0, 1]:
+            image_.data[0, :, (1 * w_) + offset] = 0.0
+            image_.data[1, :, (1 * w_) + offset] = 1.0
+            image_.data[2, :, (1 * w_) + offset] = 0.0
+            image_.data[0, :, (2 * w_) + offset] = 1.0
+            image_.data[1, :, (2 * w_) + offset] = 0.0
+            image_.data[2, :, (2 * w_) + offset] = 0.0
+            image_.data[0, :, (3 * w_) + offset] = 0.0
+            image_.data[1, :, (3 * w_) + offset] = 1.0
+            image_.data[2, :, (3 * w_) + offset] = 0.0
         image_.save('data/augmentations/%s_augmented_%d%s' % (basename, version, ext, ))
 
 data = (
@@ -76,7 +89,7 @@ data = (
     .split_by_valid_func(lambda path: path2fn(path) in val_fns)
     .label_from_func(lambda path: fn2label[path2fn(path)])
     .add_test(ImageList.from_folder('data/crop_test'))
-    .transform(tfms, size=(SZH, SZW), resize_method=ResizeMethod.SQUISH, padding_mode='reflection')
+    .transform(tfms, size=(SZH, SZW), resize_method=ResizeMethod.SQUISH, padding_mode='zeros')
     .databunch(bs=BS, num_workers=NUM_WORKERS, path='data')
     .normalize(imagenet_stats)
 )
@@ -99,15 +112,51 @@ if torch.cuda.device_count() > 1:
     print("Using", torch.cuda.device_count(), "GPUs!")
     network_model = nn.DataParallel(network_model)
 
+
+class SingletonAccuracy(Callback):
+    "Wrap a `func` in a callback for metrics computation."
+    def __init__(self, func, name):
+        super().__init__()
+        # If it's a partial, use func.func
+        # name = getattr(func, 'func', func).__name__
+        self.func, self.name = func, name
+
+    def on_epoch_begin(self, **kwargs):
+        self.value_list = []
+
+    def on_batch_end(self, last_output, last_target, **kwargs):
+        ut.embed()
+        "Update metric computation with `last_output` and `last_target`."
+        if not is_listy(last_target):
+            last_target = [last_target]
+        value = self.func(last_output, last_target)
+        self.value_list += value
+
+    def on_epoch_end(self, last_metrics, **kwargs):
+        ut.embed()
+        "Set the final result in `last_metrics`."
+        value = self.value_list.mean()
+        return add_metrics(last_metrics, value)
+
+
+top1acc_func  = partial(topkacc, k=1, mean=False)
+top5acc_func  = partial(topkacc, k=5, mean=False)
+top12acc_func = partial(topkacc, k=12, mean=False)
+
+top1acc  = SingletonAccuracy(top1acc_func, name='top1acc')
+top5acc  = SingletonAccuracy(top5acc_func, name='top5acc')
+top12acc = SingletonAccuracy(top12acc_func, name='top12acc')
+
 learn = Learner(data, network_model,
-                   metrics=[map1total, map5total, map12total],
+                   # metrics=[map1total, map5total, map12total],
+                   metrics=[top1acc, top5acc, top12acc],
                    loss_func=MultiCE,
                    callback_fns=[RingLoss])
 
 learn.clip_grad()
 learn.split([learn.model.module.cnn, learn.model.module.head])
 
-min_max_lr = 5e-5
+max_lr_ = 1e-2
 num_epochs_ = num_epochs
 for round_num in range(3):
     print ("Round %d training (freeze)" % (round_num + 1, ))
@@ -117,14 +166,15 @@ for round_num in range(3):
     except:
         learn.freeze()
 
-        # Find lr
-        learn.lr_find()
-        values = sorted(zip(learn.recorder.losses, learn.recorder.lrs))
-        max_lr = values[0][1]
-        max_lr_ = max_lr / 10.0
-        max_lr_ = max(max_lr_, min_max_lr)
-        print('Found max_lr = %0.08f, using %0.08f' % (max_lr, max_lr_))
-        # Train
+        # # Find lr
+        # learn.lr_find()
+        # break
+        # values = sorted(zip(learn.recorder.losses, learn.recorder.lrs))
+        # max_lr = values[0][1]
+        # max_lr_ = max_lr / 10.0
+        # max_lr_ = max(max_lr_, min_max_lr)
+        # print('Found max_lr = %0.08f, using %0.08f' % (max_lr, max_lr_))
+        # # Train
         learn.fit_one_cycle(num_epochs_, max_lr_)
         learn.save(name_)
 
@@ -135,16 +185,16 @@ for round_num in range(3):
     except:
         learn.unfreeze()
 
-        # Find lr
-        learn.lr_find()
-        values = sorted(zip(learn.recorder.losses, learn.recorder.lrs))
-        max_lr = values[0][1]
-        max_lr_ = max_lr / 10.0
-        max_lr_ = max(max_lr_, min_max_lr)
-        print('Found max_lr = %0.08f, using %0.08f' % (max_lr, max_lr_))
-        # Train
+        # # Find lr
+        # learn.lr_find()
+        # values = sorted(zip(learn.recorder.losses, learn.recorder.lrs))
+        # max_lr = values[0][1]
+        # max_lr_ = max_lr / 10.0
+        # max_lr_ = max(max_lr_, min_max_lr)
+        # print('Found max_lr = %0.08f, using %0.08f' % (max_lr, max_lr_))
+        # # Train
         learn.fit_one_cycle(num_epochs_, max_lr_)
-        learn.save(name)
+        learn.save(name_)
 
     num_epochs_ *= 2
 
