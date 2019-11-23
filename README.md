@@ -30,29 +30,23 @@ NV_GPU=1,3 nvidia-docker container run -it --rm --name kaggle7 -v $(pwd)/data/:/
 ```
 
 
-## To use Flukebook data
+## To use Flukebook CRC(5) data
 
 ```
-wget https://cthulhu.dyn.wildme.io/public/datasets/flukebook.id.fluke.revised.5.tar.gz
-rm -rf flukebook.id.fluke.revised.5/
-targzx flukebook.id.fluke.revised.5.tar.gz
+wget https://cthulhu.dyn.wildme.io/public/datasets/flukebook.id.fluke.crc.5.tar.gz
+rm -rf flukebook.id.fluke.crc.5/
+targzx flukebook.id.fluke.crc.5.tar.gz
 mv data/ data_OLD/
 rm -rf data/
 mkdir -p data/
 mkdir -p data/train/
 mkdir -p data/test/
-cp -R flukebook.id.fluke.encounters/train/manifest/*.jpg data/train/
-cp -R flukebook.id.fluke.encounters/test/manifest/*.jpg data/train/
-cp -R flukebook.id.fluke.encounters/test/manifest/*.jpg data/test/
-cp -R flukebook.id.fluke.encounters/train.txt data/train.txt
-cp -R flukebook.id.fluke.encounters/test.txt data/test.txt
+cp -R flukebook.id.fluke.crc.5/train/manifest/*.jpg data/train/
+cp -R flukebook.id.fluke.crc.5/test/manifest/*.jpg data/train/
+cp -R flukebook.id.fluke.crc.5/test/manifest/*.jpg data/test/
+cp -R flukebook.id.fluke.crc.5/train.txt data/train.txt
+cp -R flukebook.id.fluke.crc.5/test.txt data/test.txt
 
 python add_bboxes_and_val_fns_and_sample_submission.py
 python apply_bboxes.py
-
-###
-
-ibs
-wm3
-./dev.py --dbdir /data/jason.parham/code/whale-identification-2018/flukebook.id.fluke.revised.5/ibeis/ --cmd
 ```

@@ -27,25 +27,24 @@ val_fns = pd.read_pickle('data/val_fns')
 fn2label = {row[1].Image: row[1].Id for row in df.iterrows()}
 path2fn = lambda path: re.search('[\w-]*\.jpg$', path).group(0)
 
-SZH, SZW = 330, 1320
-BS = 24
+SZH, SZW = 400, 1550
+BS = 16
 NUM_WORKERS = 10
 SEED = 0
 SAVE_TRAIN_FEATS = True
 SAVE_TEST_MATRIX = True
-LOAD_IF_CAN = True
 
 num_classes = len(set(df.Id))  # 1571
 num_epochs = 50
 
-name = f'DenseNet201-GeM-PCB4-{SZ}-Ring-RELU'
+name = f'DenseNet201-GeM-PCB4-{SZH}-{SZW}-Ring-RELU'
 
 tfms = (
     [
         RandTransform(tfm=brightness, kwargs={'change': (0.2, 0.8)}),
         RandTransform(tfm=contrast, kwargs={'scale': (0.5, 1.5)}),
         RandTransform(tfm=symmetric_warp, kwargs={'magnitude': (-0.1, 0.1)}),
-        RandTransform(tfm=flip_lr, p=0.5),
+        RandTransform(tfm=flip_lr, kwargs={}, p=0.5),
         # RandTransform(tfm=rotate, kwargs={'degrees': (-5.0, 5.0)}),
         # RandTransform(tfm=zoom, kwargs={'scale': (0.9, 1.1), 'row_pct': (0, 1), 'col_pct': (0, 1)}),
     ],
@@ -68,7 +67,7 @@ for index in range(len(df.Image)):
 
     image.save('data/augmentations/%s_original%s' % (basename, ext, ))
     for version in range(5):
-        image_ = image.apply_tfms(tfms[0], size=SZ, resize_method=ResizeMethod.SQUISH, padding_mode='reflection')
+        image_ = image.apply_tfms(tfms[0], size=(SZH, SZW), resize_method=ResizeMethod.SQUISH, padding_mode='reflection')
         image_.save('data/augmentations/%s_augmented_%d%s' % (basename, version, ext, ))
 
 data = (
@@ -77,7 +76,7 @@ data = (
     .split_by_valid_func(lambda path: path2fn(path) in val_fns)
     .label_from_func(lambda path: fn2label[path2fn(path)])
     .add_test(ImageList.from_folder('data/crop_test'))
-    .transform(tfms, size=SZ, resize_method=ResizeMethod.SQUISH, padding_mode='reflection')
+    .transform(tfms, size=(SZH, SZW), resize_method=ResizeMethod.SQUISH, padding_mode='reflection')
     .databunch(bs=BS, num_workers=NUM_WORKERS, path='data')
     .normalize(imagenet_stats)
 )
@@ -105,25 +104,20 @@ learn = Learner(data, network_model,
                    loss_func=MultiCE,
                    callback_fns=[RingLoss])
 
-learn.split([learn.model.module.cnn, learn.model.module.head])
-learn.freeze()
 learn.clip_grad()
+learn.split([learn.model.module.cnn, learn.model.module.head])
 
-min_max_lr = 5e-3
-LOADED = False
-print ("Stage one, training only head")
-if LOAD_IF_CAN:
+min_max_lr = 5e-5
+num_epochs_ = num_epochs
+for round_num in range(3):
+    print ("Round %d training (freeze)" % (round_num + 1, ))
+    name_ = '%s-R%s-freeze' % (name, round_num, )
     try:
-        learn.load(name)
-        LOADED = True
+        learn.load(name_)
     except:
-        LOADED = False
-if not LOADED:
-    num_epochs_ = num_epochs
-    for round_num in range(3):
-        print ("Stage one, round %d training" % (round_num + 1, ))
+        learn.freeze()
 
-        # Find max_lr
+        # Find lr
         learn.lr_find()
         values = sorted(zip(learn.recorder.losses, learn.recorder.lrs))
         max_lr = values[0][1]
@@ -132,42 +126,27 @@ if not LOADED:
         print('Found max_lr = %0.08f, using %0.08f' % (max_lr, max_lr_))
         # Train
         learn.fit_one_cycle(num_epochs_, max_lr_)
-        num_epochs_ *= 2
-    learn.save(name)
-print ('Stage 1 done, finetuning everything')
+        learn.save(name_)
 
-learn.unfreeze()
-
-LOADED = False
-if LOAD_IF_CAN:
+    print ("Round %d training (unfreeze)" % (round_num + 1, ))
+    name_ = '%s-R%s-unfreeze' % (name, round_num, )
     try:
-        learn.load(name + '_unfreeze')
-        LOADED = True
+        learn.load(name_)
     except:
-        LOADED = False
+        learn.unfreeze()
 
-if not LOADED:
-    num_epochs_ = num_epochs
-    for round_num in range(3):
-        print ("Stage two, round %d training" % (round_num + 1, ))
-
-        # Find max_lr
+        # Find lr
         learn.lr_find()
         values = sorted(zip(learn.recorder.losses, learn.recorder.lrs))
         max_lr = values[0][1]
-        max_lr /= 10.0
+        max_lr_ = max_lr / 10.0
         max_lr_ = max(max_lr_, min_max_lr)
         print('Found max_lr = %0.08f, using %0.08f' % (max_lr, max_lr_))
-
         # Train
-        learn.fit_one_cycle(num_epochs_, max_lr)
-        num_epochs_ *= 2
-    learn.save(name + '_unfreeze')
+        learn.fit_one_cycle(num_epochs_, max_lr_)
+        learn.save(name)
 
-print ("Stage 2 done, starting stage 3")
-
-LOADED = False
-print ("Stage 2 done, stage 3 done")
+    num_epochs_ *= 2
 
 
 ####### Validation
@@ -185,7 +164,7 @@ data = (
         .add_test(ImageList.from_folder('data/crop_test'))
         .transform(get_transforms(do_flip=False, max_zoom=1,
                                   max_warp=0,
-                                  max_rotate=2), size=SZ, resize_method=ResizeMethod.SQUISH)
+                                  max_rotate=2), size=(SZH, SZW), resize_method=ResizeMethod.SQUISH)
         .databunch(bs=BS, num_workers=NUM_WORKERS, path='data')
         .normalize(imagenet_stats)
 )

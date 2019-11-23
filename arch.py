@@ -125,6 +125,28 @@ class PCBRingHead2(nn.Module):
             assert in_feat == 1920
             in_feat_ = 254
 
+            # 660, 660
+            # torch.Size([4, 1920, 20, 20]) -> torch.Size([4, 1920, 20, 5])
+            # torch.Size([4, 254, 5, 1])
+            #
+            # 325, 1300
+            # torch.Size([4, 1920, 10, 40]) -> torch.Size([4, 1920, 10, 10])
+            # torch.Size([4, 254, 2, 2])
+
+            # dense_blocks = make_new_densenet_block(1920).to(get_device())
+
+            # SZH, SZW = 400, 1550
+            # input_ = torch.rand((4, 3, SZH, SZW)).to(get_device())
+            # net = nn.Sequential(
+            #     network_model.module.cnn,
+            #     # dense_blocks,
+            #     # GeM(),
+            #     # Flatten(),
+            # ).to(get_device())
+            # net = nn.DataParallel(net)
+            # x = net(input_)
+            # print(x.shape)
+
             dense_blocks = make_new_densenet_block(in_feat).to(get_device())
             self.local_FE_list.append(
                 nn.Sequential(
@@ -150,7 +172,7 @@ class PCBRingHead2(nn.Module):
             )
     def forward(self, x):
         assert x.size(3) % self.num_clf == 0
-        stripe_w = int(x.size(2) // self.num_clf)
+        stripe_w = int(x.size(3) // self.num_clf)
         local_feat_list = []
         local_preds_list = []
         for i in range(self.num_clf):
