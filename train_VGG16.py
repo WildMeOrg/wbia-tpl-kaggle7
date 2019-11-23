@@ -27,7 +27,7 @@ val_fns = pd.read_pickle('data/val_fns')
 fn2label = {row[1].Image: row[1].Id for row in df.iterrows()}
 path2fn = lambda path: re.search('[\w-]*\.jpg$', path).group(0)
 
-SZ = 660
+SZH, SZW = 330, 1320
 BS = 24
 NUM_WORKERS = 10
 SEED = 0
@@ -38,15 +38,16 @@ LOAD_IF_CAN = True
 num_classes = len(set(df.Id))  # 1571
 num_epochs = 50
 
-name = f'DenseNet201-GeM-PCB8-{SZ}-Ring-RELU'
+name = f'DenseNet201-GeM-PCB4-{SZ}-Ring-RELU'
 
 tfms = (
     [
-        RandTransform(tfm=symmetric_warp, kwargs={'magnitude': (-0.2, 0.2)}),
-        RandTransform(tfm=rotate, kwargs={'degrees': (-20.0, 20.0)}),
-        RandTransform(tfm=zoom, kwargs={'scale': (0.9, 1.1), 'row_pct': (0, 1), 'col_pct': (0, 1)}),
         RandTransform(tfm=brightness, kwargs={'change': (0.2, 0.8)}),
         RandTransform(tfm=contrast, kwargs={'scale': (0.5, 1.5)}),
+        RandTransform(tfm=symmetric_warp, kwargs={'magnitude': (-0.1, 0.1)}),
+        RandTransform(tfm=flip_lr, p=0.5),
+        # RandTransform(tfm=rotate, kwargs={'degrees': (-5.0, 5.0)}),
+        # RandTransform(tfm=zoom, kwargs={'scale': (0.9, 1.1), 'row_pct': (0, 1), 'col_pct': (0, 1)}),
     ],
     []
 )
@@ -108,7 +109,7 @@ learn.split([learn.model.module.cnn, learn.model.module.head])
 learn.freeze()
 learn.clip_grad()
 
-min_max_lr = 5e-4
+min_max_lr = 5e-3
 LOADED = False
 print ("Stage one, training only head")
 if LOAD_IF_CAN:
@@ -127,8 +128,7 @@ if not LOADED:
         values = sorted(zip(learn.recorder.losses, learn.recorder.lrs))
         max_lr = values[0][1]
         max_lr_ = max_lr / 10.0
-        if round_num == 0:
-            max_lr_ = max(max_lr_, min_max_lr)
+        max_lr_ = max(max_lr_, min_max_lr)
         print('Found max_lr = %0.08f, using %0.08f' % (max_lr, max_lr_))
         # Train
         learn.fit_one_cycle(num_epochs_, max_lr_)
@@ -156,6 +156,8 @@ if not LOADED:
         values = sorted(zip(learn.recorder.losses, learn.recorder.lrs))
         max_lr = values[0][1]
         max_lr /= 10.0
+        max_lr_ = max(max_lr_, min_max_lr)
+        print('Found max_lr = %0.08f, using %0.08f' % (max_lr, max_lr_))
 
         # Train
         learn.fit_one_cycle(num_epochs_, max_lr)

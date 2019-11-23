@@ -33,9 +33,9 @@ NV_GPU=1,3 nvidia-docker container run -it --rm --name kaggle7 -v $(pwd)/data/:/
 ## To use Flukebook data
 
 ```
-wget https://cthulhu.dyn.wildme.io/public/datasets/flukebook.id.fluke.encounters.tar.gz
-rm -rf flukebook.id.fluke.encounters/
-targzx flukebook.id.fluke.encounters.tar.gz
+wget https://cthulhu.dyn.wildme.io/public/datasets/flukebook.id.fluke.revised.5.tar.gz
+rm -rf flukebook.id.fluke.revised.5/
+targzx flukebook.id.fluke.revised.5.tar.gz
 mv data/ data_OLD/
 rm -rf data/
 mkdir -p data/
@@ -49,4 +49,10 @@ cp -R flukebook.id.fluke.encounters/test.txt data/test.txt
 
 python add_bboxes_and_val_fns_and_sample_submission.py
 python apply_bboxes.py
+
+###
+
+ibs
+wm3
+./dev.py --dbdir /data/jason.parham/code/whale-identification-2018/flukebook.id.fluke.revised.5/ibeis/ --cmd
 ```
