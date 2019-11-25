@@ -64,40 +64,20 @@ def create_submission(preds, data, name, classes=None):
     sub.to_csv(f'subs/{name}.csv.gz', index=False, compression='gzip')  # NOQA
 
 
-def find_new_whale_th(preds, targs, num_classes=1571):
-    with torch.no_grad():
-        if preds.size(1) == num_classes:
-            preds2 = torch.cat((preds, torch.ones_like(preds[:, :1])), 1)
-        else:
-            preds2 = preds.clone()
-        res = []
-        ps = np.linspace(0, 0.95, 121)
-        for p in ps:
-            preds2[:, num_classes] = p
-            res.append(mapk(preds2, targs, k=5).item())
-        best_p = ps[np.argmax(res)]
-        #print (res, best_p)
-        preds2[:, num_classes] = best_p
-        score = mapk(preds2, targs, k=5)
-        print('score=', score, 'th=', best_p)
-    return preds2, best_p, score
-
-
-def find_softmax_coef(preds, targs, softmax_coefs=[0.5, 0.75, 1.0, 1.5, 2.0, 2.2], num_classes=1571):
+def find_softmax_coef(preds, targs, softmax_coefs):
     best_preds = None
-    best_th = -100
-    best_score = 0
-    best_sm_th = 0
+    best_score = -1
+    best_sc = 0
     for sc in softmax_coefs:
-        sm_preds = torch.softmax(sc * preds, dim=1).cpu()
-        preds2, best_p, score = find_new_whale_th(sm_preds, targs, num_classes=num_classes)
+        preds_ = torch.softmax(preds / sc, dim=1).cpu()
+        score = mapk(preds_, targs, k=5)
+        print(sc, score)
         if score > best_score:
-            best_preds = preds2
-            best_th = best_p
+            best_preds = preds_
             best_score = score
-            best_sm_th = sc
-    print ('best softmax=', best_sm_th)
-    return best_preds, best_th, best_sm_th, best_score
+            best_sc = sc
+    print ('best softmax=', best_sc)
+    return best_preds, best_score, best_sc
 
 
 def get_train_features(learn, augment=3):
@@ -122,21 +102,20 @@ def get_train_features(learn, augment=3):
     return train_feats, train_labels
 
 
-def find_mixing_proportions(sm_preds, sim, sim_th, targs):
+def find_mixing_proportions(sm_preds, sim, targs):
     best_score = 0
+    best_p = -1
     out_preds = None
-    for c1 in range(5):
-        for c2 in range(5):
-            for c3 in range(5):
-                c31 = float(c3)*0.2
-                out_with_feats = c1*sim + c2*sim_th+c31*sm_preds
-                score = mapk(out_with_feats, targs, k=5)
-                if score > best_score:
-                    best_score= score
-                    thlist = [c1,c2,c31]
-                    out_preds = out_with_feats
+    for p in np.arange(0.0, 1.01, 0.01):
+        out_with_feats = p * sm_preds + (1.0 - p) * sim
+        score = mapk(out_with_feats, targs, k=5)
+        print(p, score)
+        if score > best_score:
+            best_score = score
+            best_p = p
+            out_preds = out_with_feats
 
-    return out_preds, thlist, best_score
+    return out_preds, best_p, best_score
 
 
 def get_predictions(model, val_loader):
@@ -201,6 +180,7 @@ def distance_matrix_vector(anchor, positive, d2_sq):
     eps = 1e-6
     return torch.sqrt((d1_sq.repeat(1, positive.size(0)) + torch.t(d2_sq.repeat(1, anchor.size(0)))
                       - 2.0 * torch.bmm(anchor.unsqueeze(0), torch.t(positive).unsqueeze(0)).squeeze(0))+eps)
+
 def dm2cm(dm, labels):
     cl = set(labels.detach().cpu().numpy())
     n_cl = len(cl)

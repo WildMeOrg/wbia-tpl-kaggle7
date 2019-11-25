@@ -17,13 +17,23 @@ from arch import *
 from utils import *
 from losses import *
 import torchvision
-import utool as ut
 import os
 
 print("torch.cuda.is_available:", torch.cuda.is_available())
 
 df = pd.read_csv('data/train.csv')
 val_fns = pd.read_pickle('data/val_fns')
+
+ids = list(df.Id)
+count_dict = {}
+singleton_ids = set([])
+for id_ in set(ids):
+    count = ids.count(id_)
+    if count not in count_dict:
+        count_dict[count] = 0
+    count_dict[count] += 1
+    if count <= 2:
+        singleton_ids.add(id_)
 
 fn2label = {row[1].Image: row[1].Id for row in df.iterrows()}
 path2fn = lambda path: re.search('[\w-]*\.jpg$', path).group(0)
@@ -85,7 +95,7 @@ for index in range(len(df.Image)):
 
 data = (
     ImageListGray
-    .from_df(df[df.Id != 'new_whale'], 'data/crop_train', cols=['Image'])
+    .from_df(df, 'data/crop_train', cols=['Image'])
     .split_by_valid_func(lambda path: path2fn(path) in val_fns)
     .label_from_func(lambda path: fn2label[path2fn(path)])
     .add_test(ImageList.from_folder('data/crop_test'))
@@ -93,6 +103,12 @@ data = (
     .databunch(bs=BS, num_workers=NUM_WORKERS, path='data')
     .normalize(imagenet_stats)
 )
+
+classes = data.classes
+singleton_idx = set([])
+for index, id_ in enumerate(classes):
+    if id_ in singleton_ids:
+        singleton_idx.add(index)
 
 
 class CustomPCBNetwork(nn.Module):
@@ -113,29 +129,45 @@ if torch.cuda.device_count() > 1:
     network_model = nn.DataParallel(network_model)
 
 
-class SingletonAccuracy(Callback):
+class Accuracy(Callback):
     "Wrap a `func` in a callback for metrics computation."
-    def __init__(self, func, name):
+    def __init__(self, func, name, singletons=None):
         super().__init__()
         # If it's a partial, use func.func
         # name = getattr(func, 'func', func).__name__
-        self.func, self.name = func, name
+        self.func = func
+        self.name = name
+        self.singletons = singletons
 
     def on_epoch_begin(self, **kwargs):
-        self.value_list = []
+        self.values = []
+        self.targets = []
 
     def on_batch_end(self, last_output, last_target, **kwargs):
-        ut.embed()
         "Update metric computation with `last_output` and `last_target`."
-        if not is_listy(last_target):
-            last_target = [last_target]
-        value = self.func(last_output, last_target)
-        self.value_list += value
+        last_preds = last_output[-1]
+        value = self.func(last_preds, last_target)
+        self.values.append(value)
+        self.targets.append(last_target)
 
     def on_epoch_end(self, last_metrics, **kwargs):
-        ut.embed()
         "Set the final result in `last_metrics`."
-        value = self.value_list.mean()
+        values = torch.cat(self.values)
+        targets = torch.cat(self.targets)
+
+        if self.singletons is not None:
+            values_ = values.tolist()
+            targets_ = targets.tolist()
+
+            values_singletons = []
+            for value_, target_ in zip(values_, targets_):
+                if target_ in self.singletons:
+                    values_singletons.append(value_)
+            value_ = sum(values_singletons) / len(values_singletons)
+            value = torch.tensor(value_).to(get_device())
+        else:
+            value = values.mean()
+
         return add_metrics(last_metrics, value)
 
 
@@ -143,13 +175,16 @@ top1acc_func  = partial(topkacc, k=1, mean=False)
 top5acc_func  = partial(topkacc, k=5, mean=False)
 top12acc_func = partial(topkacc, k=12, mean=False)
 
-top1acc  = SingletonAccuracy(top1acc_func, name='top1acc')
-top5acc  = SingletonAccuracy(top5acc_func, name='top5acc')
-top12acc = SingletonAccuracy(top12acc_func, name='top12acc')
+top1acc  = Accuracy(top1acc_func, name='top1acc')
+top5acc  = Accuracy(top5acc_func, name='top5acc')
+top12acc = Accuracy(top12acc_func, name='top12acc')
+top1accS  = Accuracy(top1acc_func, name='top1acc*', singletons=singleton_idx)
+top5accS  = Accuracy(top5acc_func, name='top5acc*', singletons=singleton_idx)
+top12accS = Accuracy(top12acc_func, name='top12acc*', singletons=singleton_idx)
 
 learn = Learner(data, network_model,
                    # metrics=[map1total, map5total, map12total],
-                   metrics=[top1acc, top5acc, top12acc],
+                   metrics=[top1acc, top5acc, top12acc, top1accS, top5accS, top12accS],
                    loss_func=MultiCE,
                    callback_fns=[RingLoss])
 
@@ -199,76 +234,62 @@ for round_num in range(3):
     num_epochs_ *= 2
 
 
-####### Validation
-print ("Starting validation")
-df = pd.read_csv('data/train.csv')
-val_fns = pd.read_pickle('data/val_fns')
-new_whale_fns = set(df[df.Id == 'new_whale'].sample(frac=1).Image.iloc[:1000])
-y = val_fns.union(new_whale_fns)
-classes = learn.data.classes + ['new_whale']
-data = (
-    ImageListGray
-        .from_df(df, 'data/crop_train', cols=['Image'])
-        .split_by_valid_func(lambda path: path2fn(path) in y)
-        .label_from_func(lambda path: fn2label[path2fn(path)], classes=classes)
-        .add_test(ImageList.from_folder('data/crop_test'))
-        .transform(get_transforms(do_flip=False, max_zoom=1,
-                                  max_warp=0,
-                                  max_rotate=2), size=(SZH, SZW), resize_method=ResizeMethod.SQUISH)
-        .databunch(bs=BS, num_workers=NUM_WORKERS, path='data')
-        .normalize(imagenet_stats)
-)
-data.train_dl.dl.batch_sampler.sampler = torch.utils.data.SequentialSampler(data.train_ds)
-data.train_dl.dl.batch_sampler.drop_last = False
-data.valid_dl.dl.batch_sampler.sampler = torch.utils.data.SequentialSampler(data.valid_ds)
-data.valid_dl.dl.batch_sampler.drop_last = False
-
-learn.data = data
-targs = torch.tensor([classes.index(label.obj) if label else num_classes for label in learn.data.valid_ds.y])
-
 ####
-val_preds, val_gt,val_feats,val_preds2 = get_predictions(learn.model,data.valid_dl)
+# temperature scaling
+val_preds, val_gt, val_feats, val_preds2 = get_predictions(learn.model, data.valid_dl)
+val_preds = val_preds.to(get_device())
 print ("Finding softmax coef")
-best_preds, best_th, best_sm_th, best_score = find_softmax_coef(val_preds,targs, [0.1, 0.2, 0.3, 0.5, 1.0, 2.0, 3.0])
+targs = torch.tensor([classes.index(label.obj) if label else num_classes for label in learn.data.valid_ds.y])
+coefs = list(np.arange(0.01, 3.1, 0.05))
+best_preds, best_acc, best_sc = find_softmax_coef(val_preds, targs, coefs)
+min_best_sc = best_sc / 2.0
+max_best_sc = best_sc * 2.0
+step_best_sc = min_best_sc / 10.0
+coefs = list(np.arange(min_best_sc, max_best_sc, step_best_sc))
+best_preds, best_acc, best_sc = find_softmax_coef(val_preds, targs, coefs)
+best_preds = best_preds.to(get_device())
 
 ####### Now features
 print ("Extracting train feats")
 train_feats, train_labels = get_train_features(learn, augment=0)
 distance_matrix_imgs = batched_dmv(val_feats, train_feats)
 distance_matrix_classes = dm2cm(distance_matrix_imgs, train_labels)
-class_sims = 0.5*(2.0 - distance_matrix_classes)
-class_sims_th, best_th_feats, score_feats_th = find_new_whale_th(class_sims, targs)
-out_preds, thlist, best_score = find_mixing_proportions(best_preds,
-                                                       class_sims,
-                                                      class_sims_th,targs)
+class_sims = 0.5 * (2.0 - distance_matrix_classes)
+class_sims = class_sims.to(get_device())
+out_preds, best_p, best_score = find_mixing_proportions(best_preds, class_sims, targs)
+
 out_preds = out_preds.to(get_device())
 targs = targs.to(get_device())
-print ("Best mix score = ", best_score)
-print ("Val top1 acc = ", accuracy(out_preds, targs).cpu().item())
-print ("Val map5 = ",map5(out_preds, targs).cpu().item())
-print ("Val top5 acc = ",topkacc(out_preds, targs, k=5).cpu().item())
+print ("Raw Val top1 acc   = ", accuracy(val_preds, targs).cpu().item())
+print ("Raw Val top5 acc   = ", topkacc(val_preds, targs, k=5).cpu().item())
+print ("Raw Val top12 acc  = ", topkacc(val_preds, targs, k=12).cpu().item())
+print ("SM  Val top1 acc   = ", accuracy(best_preds, targs).cpu().item())
+print ("SM  Val top5 acc   = ", topkacc(best_preds, targs, k=5).cpu().item())
+print ("SM  Val top12 acc  = ", topkacc(best_preds, targs, k=12).cpu().item())
+print ("Cls Val top1 acc   = ", accuracy(class_sims, targs).cpu().item())
+print ("Cls Val top5 acc   = ", topkacc(class_sims, targs, k=5).cpu().item())
+print ("Cls Val top12 acc  = ", topkacc(class_sims, targs, k=12).cpu().item())
+print ("Mix Val top1 acc   = ", accuracy(out_preds, targs).cpu().item())
+print ("Mix Val top5 acc   = ", topkacc(out_preds, targs, k=5).cpu().item())
+print ("Mix Val top12 acc  = ", topkacc(out_preds, targs, k=12).cpu().item())
 thresholds = {}
-thresholds['softmax'] = best_sm_th
-thresholds['preds_th'] = best_th
-thresholds['preds_th_feats'] = best_th_feats
-thresholds['mix_list'] = thlist
+thresholds['softmax'] = best_sc
+thresholds['features'] = best_p
 torch.save(thresholds, 'data/models/' + name + '_thresholds.pth')
 
-if SAVE_TRAIN_FEATS:
-    print ("Saving train feats")
-    torch.save({"train_labels": train_labels.detach().cpu(),
-                "train_feats": train_feats.detach().cpu(),
-                "val_labels": targs,
-                "val_feats": val_feats.detach().cpu(),
-                "classes": classes,
-                "thresholds": thresholds,
-                }, 'data/models/' + name + '_train_val_feats.pt')
-
+print ("Saving train feats")
+torch.save({"train_labels": train_labels.detach().cpu(),
+            "train_feats": train_feats.detach().cpu(),
+            "val_labels": targs,
+            "val_feats": val_feats.detach().cpu(),
+            "classes": classes,
+            "thresholds": thresholds,
+            }, 'data/models/' + name + '_train_val_feats.pt')
 
 
 ###############
 #Test
-test_preds,  test_gt,test_feats,test_preds2 = get_predictions(learn.model,data.test_dl)
+test_preds,  test_gt,test_feats,test_preds2 = get_predictions(learn.model, data.test_dl)
 preds_t = torch.softmax(best_sm_th * test_preds, dim=1)
 preds_t = torch.cat((preds_t, torch.ones_like(preds_t[:, :1])), 1)
 preds_t[:, num_classes] = best_th
@@ -288,10 +309,3 @@ if SAVE_TEST_MATRIX:
                 "classes": classes,
                 "thresholds": thresholds,
                 }, 'data/models/' + name + '_test_feats.pt')
-
-try:
-    os.makedirs('subs')
-except:
-    pass
-create_submission(pit1.cpu(), learn.data, name, classes)
-print ('new_whales at 1st pos:', pd.read_csv(f'subs/{name}.csv.gz').Id.str.split().apply(lambda x: x[0] == 'new_whale').mean())
