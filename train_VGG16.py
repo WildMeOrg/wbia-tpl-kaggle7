@@ -19,6 +19,105 @@ from losses import *
 import torchvision
 import os
 
+
+SZH, SZW = 400, 1550
+BS = 16
+NUM_WORKERS = 10
+SEED = 0
+SAVE_TRAIN_FEATS = True
+SAVE_TEST_MATRIX = True
+RING_ALPHA = 0.01
+
+
+class CustomPCBNetwork(nn.Module):
+    def __init__(self, new_model):
+        super().__init__()
+        self.cnn =  new_model.features
+        self.head = PCBRingHead2(num_classes, 256, 2, 1920)
+
+    def forward(self, x):
+        x = self.cnn(x)
+        out = self.head(x)
+        return out
+
+
+class Accuracy(Callback):
+    """Wrap a `func` in a callback for metrics computation."""
+
+    def __init__(self, func, name, singletons=None):
+        super().__init__()
+        # If it's a partial, use func.func
+        # name = getattr(func, 'func', func).__name__
+        self.func = func
+        self.name = name
+        self.singletons = singletons
+
+    def on_epoch_begin(self, **kwargs):
+        self.values = []
+        self.targets = []
+
+    def on_batch_end(self, last_output, last_target, **kwargs):
+        """Update metric computation with `last_output` and `last_target`."""
+        last_preds = last_output[-1]
+        value = self.func(last_preds, last_target)
+        self.values.append(value)
+        self.targets.append(last_target)
+
+    def on_epoch_end(self, last_metrics, **kwargs):
+        """Set the final result in `last_metrics`."""
+        values = torch.cat(self.values)
+        targets = torch.cat(self.targets)
+
+        if self.singletons is not None:
+            values_ = values.tolist()
+            targets_ = targets.tolist()
+
+            values_singletons = []
+            for value_, target_ in zip(values_, targets_):
+                if target_ in self.singletons:
+                    values_singletons.append(value_)
+            value_ = sum(values_singletons) / len(values_singletons)
+            value = torch.tensor(value_).to(get_device())
+        else:
+            value = values.mean()
+
+        return add_metrics(last_metrics, value)
+
+
+@dataclass
+class RingLoss(Callback):
+    """`Callback` that regroups lr adjustment to seq_len, AR and TAR."""
+    learn:Learner
+    alpha:float=RING_ALPHA
+
+    def on_loss_begin(self, last_output:Tuple[list,list], **kwargs):
+        "Save the extra outputs for later and only returns the true output."
+        self.feature_out = last_output[1]
+        return {'last_output': last_output[0]}
+
+    def on_backward_begin(self,
+                          last_loss:Rank0Tensor,
+                          last_input:list,
+                          last_target:Tensor,
+                          **kwargs):
+        x_list = self.feature_out
+        ring_list = self.learn.model.module.head.rings
+        num_clf = len(ring_list)
+        loss = None
+        for cc in range(num_clf):
+            x = x_list[cc]
+            R = ring_list[cc]
+            x_norm = x.pow(2).sum(dim=1).pow(0.5)
+            diff = torch.mean(torch.abs(x_norm - R.expand_as(x_norm))**2)
+            if loss is None:
+                loss = diff.mean()
+            else:
+                loss = loss + diff.mean()
+        loss = (self.alpha * loss).sum()
+        last_loss += loss
+        return {'last_loss': last_loss}
+
+
 print("torch.cuda.is_available:", torch.cuda.is_available())
 
 df = pd.read_csv('data/train.csv')
@@ -38,23 +137,16 @@ for id_ in set(ids):
 fn2label = {row[1].Image: row[1].Id for row in df.iterrows()}
 path2fn = lambda path: re.search('[\w-]*\.jpg$', path).group(0)
 
-SZH, SZW = 400, 1550
-BS = 16
-NUM_WORKERS = 10
-SEED = 0
-SAVE_TRAIN_FEATS = True
-SAVE_TEST_MATRIX = True
-
 num_classes = len(set(df.Id))  # 1571
 num_epochs = 50
 
-name = f'DenseNet201-GeM-PCB4-{SZH}-{SZW}-Ring-RELU'
+name = f'DenseNet201-GeM-PCB4-{SZH}-{SZW}-Ring-{RING_ALPHA}_RELU'
 
 tfms = (
     [
         RandTransform(tfm=brightness, kwargs={'change': (0.2, 0.8)}),
         RandTransform(tfm=contrast, kwargs={'scale': (0.5, 1.5)}),
-        RandTransform(tfm=symmetric_warp, kwargs={'magnitude': (-0.05, 0.05)}),
+        RandTransform(tfm=symmetric_warp, kwargs={'magnitude': (-0.01, 0.01)}),
         # RandTransform(tfm=flip_lr, kwargs={}, p=0.5),
         # RandTransform(tfm=rotate, kwargs={'degrees': (-5.0, 5.0)}),
         # RandTransform(tfm=zoom, kwargs={'scale': (0.9, 1.1), 'row_pct': (0, 1), 'col_pct': (0, 1)}),
@@ -111,65 +203,11 @@ for index, id_ in enumerate(classes):
         singleton_idx.add(index)
 
 
-class CustomPCBNetwork(nn.Module):
-    def __init__(self, new_model):
-        super().__init__()
-        self.cnn =  new_model.features
-        self.head = PCBRingHead2(num_classes, 256, 4, 1920)
-
-    def forward(self, x):
-        x = self.cnn(x)
-        out = self.head(x)
-        return out
-
 network_model = CustomPCBNetwork(torchvision.models.densenet201(pretrained=True))
 
 if torch.cuda.device_count() > 1:
     print("Using", torch.cuda.device_count(), "GPUs!")
     network_model = nn.DataParallel(network_model)
-
-
-class Accuracy(Callback):
-    "Wrap a `func` in a callback for metrics computation."
-    def __init__(self, func, name, singletons=None):
-        super().__init__()
-        # If it's a partial, use func.func
-        # name = getattr(func, 'func', func).__name__
-        self.func = func
-        self.name = name
-        self.singletons = singletons
-
-    def on_epoch_begin(self, **kwargs):
-        self.values = []
-        self.targets = []
-
-    def on_batch_end(self, last_output, last_target, **kwargs):
-        "Update metric computation with `last_output` and `last_target`."
-        last_preds = last_output[-1]
-        value = self.func(last_preds, last_target)
-        self.values.append(value)
-        self.targets.append(last_target)
-
-    def on_epoch_end(self, last_metrics, **kwargs):
-        "Set the final result in `last_metrics`."
-        values = torch.cat(self.values)
-        targets = torch.cat(self.targets)
-
-        if self.singletons is not None:
-            values_ = values.tolist()
-            targets_ = targets.tolist()
-
-            values_singletons = []
-            for value_, target_ in zip(values_, targets_):
-                if target_ in self.singletons:
-                    values_singletons.append(value_)
-            value_ = sum(values_singletons) / len(values_singletons)
-            value = torch.tensor(value_).to(get_device())
-        else:
-            value = values.mean()
-
-        return add_metrics(last_metrics, value)
-
 
 top1acc_func  = partial(topkacc, k=1, mean=False)
 top5acc_func  = partial(topkacc, k=5, mean=False)
@@ -185,15 +223,20 @@ top12accS = Accuracy(top12acc_func, name='top12acc*', singletons=singleton_idx)
 learn = Learner(data, network_model,
                    # metrics=[map1total, map5total, map12total],
                    metrics=[top1acc, top5acc, top12acc, top1accS, top5accS, top12accS],
-                   loss_func=MultiCE,
-                   callback_fns=[RingLoss])
+                   loss_func=CrossEntropyFlat,
+                   callback_fns=[MultiCE])
 
 learn.clip_grad()
 learn.split([learn.model.module.cnn, learn.model.module.head])
 
 max_lr_ = 1e-2
-num_epochs_ = num_epochs
-for round_num in range(3):
+
+# num_epochs_ = num_epochs
+# rounds = list(range(3))
+num_epochs_ = 100
+rounds = [0]
+
+for round_num in rounds:
     print ("Round %d training (freeze)" % (round_num + 1, ))
     name_ = '%s-R%s-freeze' % (name, round_num, )
     try:

@@ -40,13 +40,14 @@ class GeM(nn.Module):
         super(GeM,self).__init__()
         self.p = Parameter(torch.ones(1)*p)
         self.eps = eps
+
     def forward(self, x):
         return gem(x, p=torch.clamp(self.p, min=0.1), eps=self.eps)
+
     def __repr__(self):
         return self.__class__.__name__ + '(' + 'p=' + '{:.4f}'.format(self.p.data.tolist()[0]) + ', ' + 'eps=' + str(self.eps) + ')'
 
 class GeMConst(nn.Module):
-
     def __init__(self, p=3.74, eps=1e-6):
         super(GeMConst, self).__init__()
         self.p =p
@@ -59,16 +60,6 @@ class GeMConst(nn.Module):
         return self.__class__.__name__ + '(' + 'p=' + '{:.4f}'.format(self.p) + ', ' + 'eps=' + str(
             self.eps) + ')'
 
-class L2Norm(nn.Module):
-    def __init__(self):
-        super(L2Norm,self).__init__()
-        self.eps = 1e-10
-    def forward(self, x):
-        norm = torch.sqrt(torch.sum(x * x, dim = 1) + self.eps)
-        x= x / norm.unsqueeze(-1).expand_as(x)
-        return x
-
-
 def make_new_densenet_block(in_feat):
     dense_blocks = nn.Sequential()
 
@@ -77,7 +68,7 @@ def make_new_densenet_block(in_feat):
     block_config = (6, 8, 6)
     growth_rate = 16
     bn_size = 4
-    drop_rate = 0.5
+    drop_rate = 0.25
     memory_efficient = False
     for i, num_layers in enumerate(block_config):
         block = torchvision.models.densenet._DenseBlock(
@@ -170,6 +161,7 @@ class PCBRingHead2(nn.Module):
                     nn.Linear(in_features=feat_dim, out_features=num_classes, bias=True)
                 )
             )
+
     def forward(self, x):
         assert x.size(3) % self.num_clf == 0
         stripe_w = int(x.size(3) // self.num_clf)
