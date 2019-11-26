@@ -27,13 +27,14 @@ SEED = 0
 SAVE_TRAIN_FEATS = True
 SAVE_TEST_MATRIX = True
 RING_ALPHA = 0.01
+GEM_CONST = 5.0
 
 
 class CustomPCBNetwork(nn.Module):
     def __init__(self, new_model):
         super().__init__()
         self.cnn =  new_model.features
-        self.head = PCBRingHead2(num_classes, 256, 2, 1920)
+        self.head = PCBRingHead2(num_classes, 256, 2, 1920, GEM_CONST)
 
     def forward(self, x):
         x = self.cnn(x)
@@ -140,7 +141,7 @@ path2fn = lambda path: re.search('[\w-]*\.jpg$', path).group(0)
 num_classes = len(set(df.Id))  # 1571
 num_epochs = 50
 
-name = f'DenseNet201-GeM-PCB4-{SZH}-{SZW}-Ring-{RING_ALPHA}_RELU'
+name = f'DenseNet201-GeM-{GEM_CONST}-PCB4-{SZH}-{SZW}-Ring-{RING_ALPHA}_RELU'
 
 tfms = (
     [
@@ -201,7 +202,6 @@ singleton_idx = set([])
 for index, id_ in enumerate(classes):
     if id_ in singleton_ids:
         singleton_idx.add(index)
-
 
 network_model = CustomPCBNetwork(torchvision.models.densenet201(pretrained=True))
 

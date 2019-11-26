@@ -95,7 +95,7 @@ def make_new_densenet_block(in_feat):
 
 
 class PCBRingHead2(nn.Module):
-    def __init__(self, num_classes, feat_dim, num_clf=4, in_feat=2048, r_init=1.5):
+    def __init__(self, num_classes, feat_dim, num_clf=4, in_feat=2048, r_init=1.5, gem_const=3.74):
         super(PCBRingHead2,self).__init__()
         self.eps = 1e-10
         self.num_classes = num_classes
@@ -103,6 +103,7 @@ class PCBRingHead2(nn.Module):
         self.num_clf = num_clf
         self.local_FE_list = nn.ModuleList()
         self.rings =  nn.ParameterList()
+        self.gem_const = gem_const
 
         self.total_clf = nn.Sequential(
             nn.Dropout(p=0.5),
@@ -127,10 +128,12 @@ class PCBRingHead2(nn.Module):
             # dense_blocks = make_new_densenet_block(1920).to(get_device())
 
             # SZH, SZW = 400, 1550
+            # dense_blocks = make_new_densenet_block(1920).to(get_device())
             # input_ = torch.rand((4, 3, SZH, SZW)).to(get_device())
             # net = nn.Sequential(
             #     network_model.module.cnn,
-            #     # dense_blocks,
+            #     dense_blocks,
+            #     nn.AvgPool2d((3, 1)),
             #     # GeM(),
             #     # Flatten(),
             # ).to(get_device())
@@ -142,8 +145,9 @@ class PCBRingHead2(nn.Module):
             self.local_FE_list.append(
                 nn.Sequential(
                     dense_blocks,
-                    # GeMConst(3.74),
-                    GeM(),
+                    nn.AvgPool2d((3, 1)),
+                    GeMConst(self.gem_const),
+                    # GeM(),
                     Flatten(),
                     nn.BatchNorm1d(in_feat_, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
                     nn.Dropout(p=0.5),
