@@ -27,7 +27,7 @@ SEED = 0
 SAVE_TRAIN_FEATS = True
 SAVE_TEST_MATRIX = True
 RING_ALPHA = 1.0
-RING_HEADS = 2
+RING_HEADS = 4
 GEM_CONST = 5.0
 
 
@@ -35,7 +35,7 @@ class CustomPCBNetwork(nn.Module):
     def __init__(self, new_model):
         super().__init__()
         self.cnn =  new_model.features
-        self.head = PCBRingHead2(num_classes, 512, RING_HEADS, 1920, GEM_CONST)
+        self.head = PCBRingHead2(num_classes, 128, RING_HEADS, 1920, GEM_CONST)
 
     def forward(self, x):
         x = self.cnn(x)
@@ -148,15 +148,15 @@ tfms = (
     [
         RandTransform(tfm=brightness, kwargs={'change': (0.2, 0.8)}),
         RandTransform(tfm=contrast, kwargs={'scale': (0.5, 1.5)}),
-        RandTransform(tfm=symmetric_warp, kwargs={'magnitude': (-0.02, 0.02)}),
+        RandTransform(tfm=symmetric_warp, kwargs={'magnitude': (-0.01, 0.01)}),
         RandTransform(tfm=rotate, kwargs={'degrees': (-1.0, 1.0)}),
         RandTransform(tfm=zoom, kwargs={'scale': (1.0, 1.05), 'row_pct': 0.5, 'col_pct': 0.5}),
         # RandTransform(tfm=flip_lr, kwargs={}, p=0.5),
     ],
     [
-        RandTransform(tfm=brightness, kwargs={'change': (0.3, 0.8)}),
-        RandTransform(tfm=contrast, kwargs={'scale': (0.5, 1.5)}),
-        RandTransform(tfm=symmetric_warp, kwargs={'magnitude': (-0.02, 0.02)}),
+        # RandTransform(tfm=brightness, kwargs={'change': (0.3, 0.8)}),
+        # RandTransform(tfm=contrast, kwargs={'scale': (0.5, 1.5)}),
+        # RandTransform(tfm=symmetric_warp, kwargs={'magnitude': (-0.02, 0.02)}),
         # RandTransform(tfm=rotate, kwargs={'degrees': (-1.0, 1.0)}),
         # RandTransform(tfm=zoom, kwargs={'scale': (0.9, 1.0), 'row_pct': 0.5, 'col_pct': 0.5}),
         # RandTransform(tfm=flip_lr, kwargs={}, p=0.5),
@@ -167,6 +167,7 @@ if not os.path.exists('data/augmentations'):
     os.mkdir('data/augmentations')
 
 print('Exporting Augmentations:')
+grid = (3, 12)
 for index in range(len(df.Image)):
     if index > 10:
         break
@@ -181,17 +182,26 @@ for index in range(len(df.Image)):
     for version in range(5):
         image_ = image.apply_tfms(tfms[0], size=(SZH, SZW), resize_method=ResizeMethod.SQUISH, padding_mode='zeros')
         c, h, w = image_.shape
-        w_ = w // 4
-        for offset in [-1, 0, 1]:
-            image_.data[0, :, (1 * w_) + offset] = 0.0
-            image_.data[1, :, (1 * w_) + offset] = 1.0
-            image_.data[2, :, (1 * w_) + offset] = 0.0
-            image_.data[0, :, (2 * w_) + offset] = 1.0
-            image_.data[1, :, (2 * w_) + offset] = 0.0
-            image_.data[2, :, (2 * w_) + offset] = 0.0
-            image_.data[0, :, (3 * w_) + offset] = 0.0
-            image_.data[1, :, (3 * w_) + offset] = 1.0
-            image_.data[2, :, (3 * w_) + offset] = 0.0
+
+        h_ = h // grid[0]
+        w_ = w // grid[1]
+
+        for grid_h in range(1, grid[0], 1):
+            color = (0.0, 0.0, 1.0)
+            for offset in [-1, 0, 1]:
+                image_.data[0, (grid_h * h_) + offset, :] = color[0]
+                image_.data[1, (grid_h * h_) + offset, :] = color[1]
+                image_.data[2, (grid_h * h_) + offset, :] = color[2]
+
+        for grid_w in range(1, grid[1], 1):
+            if grid_w % (grid[1] // 2) == 0:
+                color = (1.0, 0.0, 0.0)
+            else:
+                color = (0.0, 1.0, 0.0)
+            for offset in [-1, 0, 1]:
+                image_.data[0, :, (grid_w * w_) + offset] = color[0]
+                image_.data[1, :, (grid_w * w_) + offset] = color[1]
+                image_.data[2, :, (grid_w * w_) + offset] = color[2]
         image_.save('data/augmentations/%s_augmented_%d%s' % (basename, version, ext, ))
 
 data = (
