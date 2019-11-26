@@ -145,9 +145,9 @@ class PCBRingHead2(nn.Module):
             self.local_FE_list.append(
                 nn.Sequential(
                     dense_blocks,
-                    nn.AvgPool2d((3, 1)),
-                    GeMConst(self.gem_const),
-                    # GeM(),
+                    # nn.AvgPool2d((3, 1)),
+                    # GeMConst(self.gem_const),
+                    GeM(),
                     Flatten(),
                     nn.BatchNorm1d(in_feat_, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
                     nn.Dropout(p=0.5),
