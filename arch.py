@@ -144,6 +144,7 @@ class PCBRingHead2(nn.Module):
             dense_blocks = make_new_densenet_block(in_feat).to(get_device())
             self.local_FE_list.append(
                 nn.Sequential(
+                    nn.Dropout(p=0.5),
                     dense_blocks,
                     # nn.AvgPool2d((3, 1)),
                     # GeMConst(self.gem_const),
