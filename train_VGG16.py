@@ -221,10 +221,9 @@ top5accS  = Accuracy(top5acc_func, name='top5acc*', singletons=singleton_idx)
 top12accS = Accuracy(top12acc_func, name='top12acc*', singletons=singleton_idx)
 
 learn = Learner(data, network_model,
-                   # metrics=[map1total, map5total, map12total],
                    metrics=[top1acc, top5acc, top12acc, top1accS, top5accS, top12accS],
-                   loss_func=CrossEntropyFlat,
-                   callback_fns=[MultiCE])
+                   loss_func=MultiCE,
+                   callback_fns=[RingLoss])
 
 learn.clip_grad()
 learn.split([learn.model.module.cnn, learn.model.module.head])
@@ -332,7 +331,7 @@ torch.save({"train_labels": train_labels.detach().cpu(),
 
 ###############
 #Test
-test_preds,  test_gt,test_feats,test_preds2 = get_predictions(learn.model, data.test_dl)
+test_preds, test_gt, test_feats, test_preds2 = get_predictions(learn.model, data.test_dl)
 preds_t = torch.softmax(best_sm_th * test_preds, dim=1)
 preds_t = torch.cat((preds_t, torch.ones_like(preds_t[:, :1])), 1)
 preds_t[:, num_classes] = best_th

@@ -12,11 +12,25 @@ valid_df = pd.read_csv('data/valid.txt')
 valid_df = valid_df.drop(columns=['Unixtime'])
 valid_df = valid_df.rename(columns={'ID': 'Id'})
 
+test_df = pd.read_csv('data/test.txt')
+test_df = test_df.drop(columns=['Unixtime'])
+test_df = test_df.rename(columns={'ID': 'Id'})
+
 train_df_image_set = set(train_df.Image)
 valid_df_image_set = set(valid_df.Image)
-assert len(train_df_image_set & valid_df_image_set) == 0
+test_df_image_set  = set(test_df.Image)
+
 train_df_id_set = set(train_df.Id)
 valid_df_id_set = set(valid_df.Id)
+test_df_id_set  = set(valid_df.Id)
+
+assert len(train_df_image_set & valid_df_image_set) == 0
+assert len(train_df_image_set & test_df_image_set)  == 0
+assert len(valid_df_image_set & test_df_image_set)  == 0
+
+assert train_df_id_set | valid_df_id_set == train_df_id_set
+assert train_df_id_set | test_df_id_set  == valid_df_id_set
+assert valid_df_id_set | test_df_id_set  == valid_df_id_set
 
 df = pd.concat([train_df, valid_df], ignore_index=True)
 
@@ -24,15 +38,9 @@ names = {}
 for i in range(len(df)):
     filename = df.Image[i]
     name = df.Id[i]
-    assert name in train_df_id_set
-    assert name in valid_df_id_set
     if name not in names:
         names[name] = []
     names[name].append(filename)
-
-with open('data/train.csv', 'w') as csv_file:
-    csv_str = df.to_csv(index=False)
-    csv_file.write(csv_str)
 
 freq_list = {}
 for name in names:
@@ -43,35 +51,32 @@ for name in names:
 assert 1 not in freq_list
 print(ut.repr3(freq_list))
 
-name_list = sorted(names.keys())
-submission = name_list[:5]
-submission_str = ' '.join(submission)
+with open('data/train.csv', 'w') as csv_file:
+    csv_str = df.to_csv(index=False)
+    csv_file.write(csv_str)
+
+with open('data/test.csv', 'w') as csv_file:
+    csv_str = test_df.to_csv(index=False)
+    csv_file.write(csv_str)
 
 bbox_data = []
-valid_data = []
-for image_filename in df.Image:
-    image_filepath = os.path.join('data', 'train', image_filename)
-    valid_filepath = os.path.join('data', 'valid', image_filename)
+version_list = [
+    ('train', df.Image),
+    ('test', test_df.Image)
+]
+for version, image_filenames in version_list:
+    for image_filename in image_filenames:
+        image_filepath = os.path.join('data', version, image_filename)
 
-    img = Image.open(image_filepath)
-    img_w, img_h = img.size
+        img = Image.open(image_filepath)
+        img_w, img_h = img.size
 
-    bbox_row = list(map(str, [image_filename, 0, 0, img_w, img_h]))
-    bbox_data.append(bbox_row)
-
-    if os.path.exists(valid_filepath):
-        valid_point = list(map(str, [image_filename, submission_str]))
-        valid_data.append(valid_point)
+        bbox_row = list(map(str, [image_filename, 0, 0, img_w, img_h]))
+        bbox_data.append(bbox_row)
 
 columns = ['Image', 'x0', 'y0', 'x1', 'y1']
 df = pd.DataFrame(bbox_data, columns=columns)
 with open('data/bounding_boxes.csv', 'w') as csv_file:
-    csv_str = df.to_csv(index=False)
-    csv_file.write(csv_str)
-
-columns = ['Image', 'Id']
-df = pd.DataFrame(valid_data, columns=columns)
-with open('data/sample_submission.csv', 'w') as csv_file:
     csv_str = df.to_csv(index=False)
     csv_file.write(csv_str)
 
