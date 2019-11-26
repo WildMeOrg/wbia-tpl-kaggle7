@@ -60,6 +60,32 @@ class GeMConst(nn.Module):
         return self.__class__.__name__ + '(' + 'p=' + '{:.4f}'.format(self.p) + ', ' + 'eps=' + str(
             self.eps) + ')'
 
+
+class WhaleFlukeReshape(nn.Module):
+    def __init__(self):
+        super(WhaleFlukeReshape, self).__init__()
+
+    def forward(self, x):
+        a = x.permute(0, 1, 3, 2)
+        s = a.shape
+        shape = (s[0], s[1] * s[2], s[3])
+        b = a.reshape(shape)
+        return b
+
+
+class WhaleFlukeUnshape(nn.Module):
+    def __init__(self, channels):
+        super(WhaleFlukeUnshape, self).__init__()
+        self.channels = channels
+
+    def forward(self, x):
+        s = x.shape
+        assert s[1] % self.channels == 0
+        shape = (s[0], self.channels, s[1] // self.channels)
+        a = x.reshape(shape)
+        return a
+
+
 def make_new_densenet_block(in_feat):
     dense_blocks = nn.Sequential()
 
@@ -115,7 +141,9 @@ class PCBRingHead2(nn.Module):
 
         for i in range(num_clf):
             assert in_feat == 1920
+            feat_size = 6
             in_feat_ = 254
+            conv_feat_ = 254 * feat_size
 
             # 660, 660
             # torch.Size([4, 1920, 20, 20]) -> torch.Size([4, 1920, 20, 5])
@@ -133,9 +161,13 @@ class PCBRingHead2(nn.Module):
             # net = nn.Sequential(
             #     network_model.module.cnn,
             #     dense_blocks,
-            #     nn.AvgPool2d((3, 1)),
+            #     # nn.AvgPool2d((3, 1)),
             #     # GeM(),
             #     # Flatten(),
+            #     WhaleFlukeReshape(),
+            #     nn.Conv1d(conv_feat_, conv_feat_, 3),
+            #     WhaleFlukeUnshape(in_feat_),
+            #     nn.Conv1d(in_feat_, in_feat_, feat_size),
             # ).to(get_device())
             # net = nn.DataParallel(net)
             # x = net(input_)
@@ -148,8 +180,14 @@ class PCBRingHead2(nn.Module):
                     dense_blocks,
                     # nn.AvgPool2d((3, 1)),
                     # GeMConst(self.gem_const),
-                    GeM(),
-                    Flatten(),
+                    # GeM(),
+                    # Flatten(),
+
+                    WhaleFlukeReshape(),
+                    nn.Conv1d(conv_feat_, conv_feat_, 3),
+                    WhaleFlukeUnshape(in_feat_),
+                    nn.Conv1d(in_feat_, in_feat_, feat_size),
+
                     nn.BatchNorm1d(in_feat_, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
                     nn.Dropout(p=0.5),
                     nn.Linear(in_features=in_feat_, out_features=feat_dim, bias=True),

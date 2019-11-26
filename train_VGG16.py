@@ -21,13 +21,13 @@ import os
 
 
 SZH, SZW = 400, 1550
-BS = 16
+BS = 14
 NUM_WORKERS = 10
 SEED = 0
 SAVE_TRAIN_FEATS = True
 SAVE_TEST_MATRIX = True
 RING_ALPHA = 1.0
-RING_HEADS = 4
+RING_HEADS = 2
 GEM_CONST = 5.0
 
 
@@ -156,10 +156,10 @@ tfms = (
     [
         RandTransform(tfm=brightness, kwargs={'change': (0.3, 0.8)}),
         RandTransform(tfm=contrast, kwargs={'scale': (0.5, 1.5)}),
-        # RandTransform(tfm=symmetric_warp, kwargs={'magnitude': (-0.02, 0.02)}),
+        RandTransform(tfm=symmetric_warp, kwargs={'magnitude': (-0.02, 0.02)}),
         # RandTransform(tfm=rotate, kwargs={'degrees': (-1.0, 1.0)}),
         # RandTransform(tfm=zoom, kwargs={'scale': (0.9, 1.0), 'row_pct': 0.5, 'col_pct': 0.5}),
-        RandTransform(tfm=flip_lr, kwargs={}, p=0.5),
+        # RandTransform(tfm=flip_lr, kwargs={}, p=0.5),
     ],
 )
 
@@ -236,7 +236,7 @@ learn = Learner(data, network_model,
 learn.clip_grad()
 learn.split([learn.model.module.cnn, learn.model.module.head])
 
-max_lr_ = 1e-3
+max_lr_ = 1e-2
 
 num_epochs_ = num_epochs
 rounds = list(range(3))
