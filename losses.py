@@ -67,15 +67,15 @@ import torch.nn as nn
 #             last_loss += (self.alpha * loss).sum()
 #         return {'last_loss': last_loss}
 
-def MultiCE(x,targs):
+
+def MultiCE(x, targs):
     loss = None
     l = list(x)
     for i in range(len(l)):
         out = l[i]
-        # if i == len(l)-1:
-        #     coef = 1.0
+        loss_ = CrossEntropyFlat()(out, targs)
         if loss is None:
-            loss = CrossEntropyFlat()(out, targs)
+            loss = loss_
         else:
-            loss += CrossEntropyFlat()(out, targs)
+            loss += loss_
     return loss
