@@ -148,7 +148,7 @@ tfms = (
     [
         RandTransform(tfm=brightness, kwargs={'change': (0.2, 0.8)}),
         RandTransform(tfm=contrast, kwargs={'scale': (0.5, 1.5)}),
-        RandTransform(tfm=symmetric_warp, kwargs={'magnitude': (-0.01, 0.01)}),
+        RandTransform(tfm=symmetric_warp, kwargs={'magnitude': (-0.02, 0.02)}),
         # RandTransform(tfm=flip_lr, kwargs={}, p=0.5),
         # RandTransform(tfm=rotate, kwargs={'degrees': (-5.0, 5.0)}),
         # RandTransform(tfm=zoom, kwargs={'scale': (0.9, 1.1), 'row_pct': (0, 1), 'col_pct': (0, 1)}),
