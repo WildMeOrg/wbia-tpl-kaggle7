@@ -21,12 +21,12 @@ import os
 
 
 SZH, SZW = 400, 1550
-BS = 14
+BS = 16
 NUM_WORKERS = 10
 SEED = 0
 SAVE_TRAIN_FEATS = True
 SAVE_TEST_MATRIX = True
-RING_ALPHA = 1.0
+RING_ALPHA = 0.05
 RING_HEADS = 4
 GEM_CONST = 5.0
 
@@ -194,7 +194,7 @@ for index in range(len(df.Image)):
                 image_.data[2, (grid_h * h_) + offset, :] = color[2]
 
         for grid_w in range(1, grid[1], 1):
-            if grid_w % (grid[1] // 2) == 0:
+            if grid_w % (grid[1] // RING_HEADS) == 0:
                 color = (1.0, 0.0, 0.0)
             else:
                 color = (0.0, 1.0, 0.0)

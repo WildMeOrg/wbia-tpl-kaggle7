@@ -94,8 +94,7 @@ def make_new_densenet_block(in_feat):
     block_config = (6, 8, 6)
     growth_rate = 16
     bn_size = 4
-    # drop_rate = 0.5
-    drop_rate = 0.0
+    drop_rate = 0.5
     memory_efficient = False
     for i, num_layers in enumerate(block_config):
         block = torchvision.models.densenet._DenseBlock(
@@ -177,21 +176,20 @@ class PCBRingHead2(nn.Module):
             dense_blocks = make_new_densenet_block(in_feat).to(get_device())
             self.local_FE_list.append(
                 nn.Sequential(
-                    nn.Dropout(p=0.5),
+                    # nn.Dropout(p=0.5),
 
                     dense_blocks,
+                    GeM(),
+
                     # nn.AvgPool2d((3, 1)),
                     # GeMConst(self.gem_const),
-
-                    GeM(p=1),
-                    Flatten(),
 
                     # WhaleFlukeReshape(),
                     # nn.Conv1d(conv_feat_, conv_feat_, 3),
                     # WhaleFlukeUnshape(in_feat_),
                     # nn.Conv1d(in_feat_, in_feat_, feat_size),
-                    # Flatten(),
 
+                    Flatten(),
                     nn.BatchNorm1d(in_feat_, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
                     nn.Dropout(p=0.5),
                     nn.Linear(in_features=in_feat_, out_features=feat_dim, bias=True),
