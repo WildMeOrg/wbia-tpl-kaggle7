@@ -26,7 +26,7 @@ NUM_WORKERS = 10
 SEED = 0
 SAVE_TRAIN_FEATS = True
 SAVE_TEST_MATRIX = True
-RING_ALPHA = 0.05
+RING_ALPHA = 0.01
 RING_HEADS = 4
 GEM_CONST = 5.0
 
@@ -35,7 +35,7 @@ class CustomPCBNetwork(nn.Module):
     def __init__(self, new_model):
         super().__init__()
         self.cnn =  new_model.features
-        self.head = PCBRingHead2(num_classes, 128, RING_HEADS, 1920, GEM_CONST)
+        self.head = PCBRingHead2(num_classes, 512, RING_HEADS, 1920, GEM_CONST)
 
     def forward(self, x):
         x = self.cnn(x)
@@ -140,7 +140,8 @@ fn2label = {row[1].Image: row[1].Id for row in df.iterrows()}
 path2fn = lambda path: re.search('[\w-]*\.jpg$', path).group(0)
 
 num_classes = len(set(df.Id))
-num_epochs = 50
+# num_epochs = 50
+# num_epochs = 25
 
 name = f'DenseNet201-GeM-{GEM_CONST}-PCB{RING_HEADS}-{SZH}-{SZW}-Ring-{RING_ALPHA}_RELU'
 
@@ -246,12 +247,16 @@ learn = Learner(data, network_model,
 learn.clip_grad()
 learn.split([learn.model.module.cnn, learn.model.module.head])
 
-max_lr_ = 1e-2
+# num_epochs_ = num_epochs
+max_lr_epochs_list = [
+    (1e-4,  25),
+    (1e-4,  50),
+    (2e-4,  50),
+    (5e-4,  1000),
+    (1e-3,  100),
+]
 
-num_epochs_ = num_epochs
-rounds = list(range(3))
-
-for round_num in rounds:
+for round_num, (max_lr_, num_epochs_) in enumerate(max_lr_epochs_list):
     print ("Round %d training (freeze)" % (round_num + 1, ))
     name_ = '%s-R%s-freeze' % (name, round_num, )
     try:
@@ -289,7 +294,7 @@ for round_num in rounds:
         learn.fit_one_cycle(num_epochs_, max_lr_)
         learn.save(name_)
 
-    num_epochs_ *= 2
+    # num_epochs_ *= 2
 
 
 ####

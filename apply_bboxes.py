@@ -6,8 +6,11 @@ import os
 
 bbox_df = pd.read_csv('data/bounding_boxes.csv')
 
-
-for version in ['train', 'test']:
+version_list = [
+    'train',
+    'test',
+]
+for version in version_list:
     bbox_df.head()
 
     crop_path = os.path.join('data', 'crop_%s' % (version, ))

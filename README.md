@@ -51,3 +51,35 @@ cp -R flukebook.id.fluke.crc.3/test.txt data/test.txt
 python add_bboxes_and_val_fns_and_sample_submission.py
 python apply_bboxes.py
 ```
+
+
+
+
+mv data/ data_OLD/
+rm -rf data/
+
+mkdir -p data/
+mkdir -p data/train/
+mkdir -p data/test/
+
+cp -R flukebook.id.fluke.crc.all/train/manifest/*.jpg data/train/
+cp -R flukebook.id.fluke.crc.all/valid/manifest/*.jpg data/train/
+cp -R flukebook.id.fluke.crc.all/train.txt data/train.crc.txt
+cp -R flukebook.id.fluke.crc.all/valid.txt data/valid.crc.txt
+
+cp -R data_kaggle2/ibeis/export-encounters/train/manifest/*.jpg data/train/
+cp -R data_kaggle2/ibeis/export-encounters/valid/manifest/*.jpg data/train/
+cp -R data_kaggle2/ibeis/export-encounters/train.txt data/train.kaggle.txt
+cp -R data_kaggle2/ibeis/export-encounters/valid.txt data/valid.kaggle.txt
+
+cp -R data_kaggle2/test/*.jpg data/test/
+cp -R data_kaggle2/test.csv data/test.csv
+
+sed '1d' data/train.kaggle.txt > data/train.kaggle.stripped.txt
+sed '1d' data/valid.kaggle.txt > data/valid.kaggle.stripped.txt
+
+cat data/train.crc.txt data/train.kaggle.stripped.txt > data/train.txt
+cat data/valid.crc.txt data/valid.kaggle.stripped.txt > data/valid.txt
+
+python add_bboxes_and_val_fns_and_sample_submission.py
+
