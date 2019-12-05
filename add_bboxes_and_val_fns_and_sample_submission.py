@@ -62,7 +62,7 @@ with open('data/test.csv', 'w') as csv_file:
 bbox_data = []
 version_list = [
     ('train', df.Image),
-    ('test', test_df.Image)
+    # ('test', test_df.Image)
 ]
 for version, image_filenames in version_list:
     for image_filename in image_filenames:

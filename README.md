@@ -41,6 +41,7 @@ rm -rf data/
 mkdir -p data/
 mkdir -p data/train/
 mkdir -p data/test/
+mkdir -p data/models/
 cp -R flukebook.id.fluke.crc.all/train/manifest/*.jpg data/train/
 cp -R flukebook.id.fluke.crc.all/valid/manifest/*.jpg data/train/
 cp -R flukebook.id.fluke.crc.all/valid/manifest/*.jpg data/test/
@@ -50,6 +51,7 @@ cp -R flukebook.id.fluke.crc.all/valid.txt data/test.txt
 
 python add_bboxes_and_val_fns_and_sample_submission.py
 python apply_bboxes.py
+cp pretrained.pth data/models/
 ```
 
 

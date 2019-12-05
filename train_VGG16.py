@@ -35,7 +35,7 @@ class CustomPCBNetwork(nn.Module):
     def __init__(self, new_model):
         super().__init__()
         self.cnn =  new_model.features
-        self.head = PCBRingHead2(num_classes, 512, RING_HEADS, 1920, GEM_CONST)
+        self.head = PCBRingHead2(num_classes, 256, RING_HEADS, 1920, GEM_CONST)
 
     def forward(self, x):
         x = self.cnn(x)
@@ -46,13 +46,13 @@ class CustomPCBNetwork(nn.Module):
 class Accuracy(Callback):
     """Wrap a `func` in a callback for metrics computation."""
 
-    def __init__(self, func, name, singletons=None):
+    def __init__(self, func, name, filter_set=None):
         super().__init__()
         # If it's a partial, use func.func
         # name = getattr(func, 'func', func).__name__
         self.func = func
         self.name = name
-        self.singletons = singletons
+        self.filter_set = filter_set
 
     def on_epoch_begin(self, **kwargs):
         self.values = []
@@ -70,15 +70,15 @@ class Accuracy(Callback):
         values = torch.cat(self.values)
         targets = torch.cat(self.targets)
 
-        if self.singletons is not None:
+        if self.filter_set is not None:
             values_ = values.tolist()
             targets_ = targets.tolist()
 
-            values_singletons = []
+            values_filtered = []
             for value_, target_ in zip(values_, targets_):
-                if target_ in self.singletons:
-                    values_singletons.append(value_)
-            value_ = sum(values_singletons) / len(values_singletons)
+                if target_ in self.filter_set:
+                    values_filtered.append(value_)
+            value_ = sum(values_filtered) / len(values_filtered)
             value = torch.tensor(value_).to(get_device())
         else:
             value = values.mean()
@@ -125,16 +125,31 @@ print("torch.cuda.is_available:", torch.cuda.is_available())
 df = pd.read_csv('data/train.csv')
 val_fns = pd.read_pickle('data/val_fns')
 
+images = list(df.Image)
 ids = list(df.Id)
+zipped = list(zip(images, ids))
+
+val_ids = []
+for val_fn in val_fns:
+    for image, id_ in zipped:
+        if image == val_fn:
+            val_ids.append(id_)
+
 count_dict = {}
+zerotons_ids = set([])
+nonzeroton_ids = set([])
 singleton_ids = set([])
 for id_ in set(ids):
-    count = ids.count(id_)
-    if count not in count_dict:
-        count_dict[count] = 0
-    count_dict[count] += 1
-    if count <= 2:
-        singleton_ids.add(id_)
+    if id_ not in val_ids:
+        zerotons_ids.add(id_)
+    else:
+        nonzeroton_ids.add(id_)
+        count = ids.count(id_)
+        if count not in count_dict:
+            count_dict[count] = 0
+        count_dict[count] += 1
+        if count <= 2:
+            singleton_ids.add(id_)
 
 fn2label = {row[1].Image: row[1].Id for row in df.iterrows()}
 path2fn = lambda path: re.search('[\w-]*\.jpg$', path).group(0)
@@ -217,8 +232,11 @@ data = (
 )
 
 classes = data.classes
+nonzeroton_idx = set([])
 singleton_idx = set([])
 for index, id_ in enumerate(classes):
+    if id_ in nonzeroton_ids:
+        nonzeroton_idx.add(index)
     if id_ in singleton_ids:
         singleton_idx.add(index)
 
@@ -232,12 +250,12 @@ top1acc_func  = partial(topkacc, k=1, mean=False)
 top5acc_func  = partial(topkacc, k=5, mean=False)
 top12acc_func = partial(topkacc, k=12, mean=False)
 
-top1acc  = Accuracy(top1acc_func, name='top1acc')
-top5acc  = Accuracy(top5acc_func, name='top5acc')
-top12acc = Accuracy(top12acc_func, name='top12acc')
-top1accS  = Accuracy(top1acc_func, name='top1acc*', singletons=singleton_idx)
-top5accS  = Accuracy(top5acc_func, name='top5acc*', singletons=singleton_idx)
-top12accS = Accuracy(top12acc_func, name='top12acc*', singletons=singleton_idx)
+top1acc   = Accuracy(top1acc_func,  name='top1acc',   filter_set=nonzeroton_idx)
+top5acc   = Accuracy(top5acc_func,  name='top5acc',   filter_set=nonzeroton_idx)
+top12acc  = Accuracy(top12acc_func, name='top12acc',  filter_set=nonzeroton_idx)
+top1accS  = Accuracy(top1acc_func,  name='top1acc*',  filter_set=singleton_idx)
+top5accS  = Accuracy(top5acc_func,  name='top5acc*',  filter_set=singleton_idx)
+top12accS = Accuracy(top12acc_func, name='top12acc*', filter_set=singleton_idx)
 
 learn = Learner(data, network_model,
                    metrics=[top1acc, top5acc, top12acc, top1accS, top5accS, top12accS],
@@ -247,13 +265,48 @@ learn = Learner(data, network_model,
 learn.clip_grad()
 learn.split([learn.model.module.cnn, learn.model.module.head])
 
+# Load Pretrained
+pretrained = torch.load('data/models/pretrained.pth')
+initialized = learn.model.module.state_dict()
+
+model = pretrained['model']
+key_list = model.keys()
+new_model = OrderedDict()
+
+needle_list = [
+    'cnn',
+    'head.local_FE_list.0.0.',
+    'head.local_FE_list.1.0.',
+    'head.local_FE_list.2.0.',
+    'head.local_FE_list.3.0.',
+]
+for key in key_list:
+    flag = False
+    for needle in needle_list:
+        if key.startswith(needle):
+            flag = True
+            break
+    if flag:
+        new_model[key] = model[key]
+    else:
+        print('Random: %r' % (key, ))
+        new_model[key] = initialized[key]
+pretrained['model'] = new_model
+torch.save(pretrained, 'data/models/pretrained-filtered.pth')
+learn.load('pretrained-filtered')
+
 # num_epochs_ = num_epochs
 max_lr_epochs_list = [
-    (1e-4,  25),
-    (1e-4,  50),
-    (2e-4,  50),
-    (5e-4,  1000),
+    # (1e-4,  25),
+    # (1e-4,  50),
+    # (2e-4,  50),
+    # (5e-4,  1000),
+    # (1e-3,  100),
+
+    (1e-3,  50),
     (1e-3,  100),
+    (1e-2,  50),
+    (1e-2,  100),
 ]
 
 for round_num, (max_lr_, num_epochs_) in enumerate(max_lr_epochs_list):
