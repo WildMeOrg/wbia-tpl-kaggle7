@@ -305,8 +305,8 @@ max_lr_epochs_list = [
 
     (1e-3,  50),
     (1e-3,  100),
-    (1e-2,  50),
-    (1e-2,  100),
+    # (1e-2,  50),
+    # (1e-2,  100),
 ]
 
 for round_num, (max_lr_, num_epochs_) in enumerate(max_lr_epochs_list):

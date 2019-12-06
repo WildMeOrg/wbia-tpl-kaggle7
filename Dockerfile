@@ -72,7 +72,7 @@ RUN chmod -R a+w .
 ##########################################################################################
 # STAGE 2 - Image for whale-identification-2018
 ##########################################################################################
-FROM org.wildme.ibeis.pytorch as org.wildme.ibeis.kaggle7
+FROM org.wildme.ibeis.pytorch as org.wildme.ibeis.kaggle7.train
 
 # Install additional conda dependencies
 RUN conda install -y jupyter notebook \
@@ -102,6 +102,46 @@ RUN chmod -R a+w .
 
 # Start training, assuming training data is mapped into /data
 ENTRYPOINT ["python", "train_VGG16.py"]
+
+# Optional commands to the training script are supported as CLI arguments
+CMD []
+
+# Send proper stop signal on container termination
+STOPSIGNAL SIGTERM
+
+##########################################################################################
+# STAGE 2 - Image for whale-identification-2018
+##########################################################################################
+FROM org.wildme.ibeis.pytorch as org.wildme.ibeis.kaggle7.server
+
+# Install additional conda dependencies
+RUN conda install -y jupyter notebook \
+ && conda install -c conda-forge jupyter_contrib_nbextensions \
+ && conda clean -ya
+
+# Install additional PyPI dependencies
+RUN pip install fastai pretrainedmodels
+
+# Pre-download pre-trained VGG-16 model with Batch Norm
+RUN python -c 'import torchvision; torchvision.models.densenet201(pretrained=True)'
+
+# Copy local Python code from repo into container
+COPY ./*.py /opt/whale/
+
+# Destination for data
+RUN mkdir -p /data
+
+# Add symlink to /data
+RUN ln -s /data /opt/whale/data 
+
+# Set workdir to the main repository for convenience
+WORKDIR /opt/whale/
+
+# Update permissions in the file-system to be fully writable by all
+RUN chmod -R a+w .
+
+# Start training, assuming training data is mapped into /data
+ENTRYPOINT ["python", "server.py"]
 
 # Optional commands to the training script are supported as CLI arguments
 CMD []
