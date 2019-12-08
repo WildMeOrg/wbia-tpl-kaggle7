@@ -351,6 +351,18 @@ for round_num, (max_lr_, num_epochs_) in enumerate(max_lr_epochs_list):
 
 
 ####
+
+data = (
+    ImageListGray
+    .from_df(df, 'data/crop_train', cols=['Image'])
+    .split_by_valid_func(lambda path: path2fn(path) in val_fns)
+    .label_from_func(lambda path: fn2label[path2fn(path)])
+    .add_test(ImageList.from_folder('data/crop_test'))
+    .transform(tfms, size=(SZH, SZW), resize_method=ResizeMethod.SQUISH, padding_mode='zeros')
+    .databunch(bs=1, num_workers=NUM_WORKERS, path='data')
+    .normalize(imagenet_stats)
+)
+
 # temperature scaling
 val_preds, val_gt, val_feats, val_preds2 = get_predictions(learn.model, data.valid_dl)
 val_preds = val_preds.to(get_device())
@@ -367,12 +379,23 @@ best_preds = best_preds.to(get_device())
 
 ####### Now features
 print ("Extracting train feats")
-train_feats, train_labels = get_train_features(learn, augment=0)
+train_preds, train_gt, train_feats, train_preds2 = get_predictions(learn.model, data.train_dl)
+# train_feats, train_gt = get_train_features(learn, augment=0)
 distance_matrix_imgs = batched_dmv(val_feats, train_feats)
-distance_matrix_classes = dm2cm(distance_matrix_imgs, train_labels)
-class_sims = 0.5 * (2.0 - distance_matrix_classes)
+distance_matrix_classes = dm2cm(distance_matrix_imgs, train_gt)
+class_sims = (2.0 - distance_matrix_classes) * 0.5
 class_sims = class_sims.to(get_device())
-out_preds, best_p, best_score = find_mixing_proportions(best_preds, class_sims, targs)
+
+coefs = list(np.arange(0.01, 3.1, 0.05))
+class_preds, class_acc, class_sc = find_softmax_coef(class_sims, targs, coefs)
+min_class_sc = class_sc / 2.0
+max_class_sc = class_sc * 2.0
+step_class_sc = min_class_sc / 10.0
+coefs = list(np.arange(min_class_sc, max_class_sc, step_class_sc))
+class_preds, class_acc, class_sc = find_softmax_coef(class_sims, targs, coefs)
+class_preds = class_preds.to(get_device())
+
+out_preds, best_p, best_score = find_mixing_proportions(best_preds, class_preds, targs)
 
 out_preds = out_preds.to(get_device())
 targs = targs.to(get_device())
@@ -385,43 +408,27 @@ print ("SM  Val top12 acc  = ", topkacc(best_preds, targs, k=12).cpu().item())
 print ("Cls Val top1 acc   = ", accuracy(class_sims, targs).cpu().item())
 print ("Cls Val top5 acc   = ", topkacc(class_sims, targs, k=5).cpu().item())
 print ("Cls Val top12 acc  = ", topkacc(class_sims, targs, k=12).cpu().item())
+print ("CM Val top1 acc   = ", accuracy(class_preds, targs).cpu().item())
+print ("CM Val top5 acc   = ", topkacc(class_preds, targs, k=5).cpu().item())
+print ("CM Val top12 acc  = ", topkacc(class_preds, targs, k=12).cpu().item())
 print ("Mix Val top1 acc   = ", accuracy(out_preds, targs).cpu().item())
 print ("Mix Val top5 acc   = ", topkacc(out_preds, targs, k=5).cpu().item())
 print ("Mix Val top12 acc  = ", topkacc(out_preds, targs, k=12).cpu().item())
+
 thresholds = {}
-thresholds['softmax'] = best_sc
-thresholds['features'] = best_p
-torch.save(thresholds, 'data/models/' + name + '_thresholds.pth')
+thresholds['classifier_softmax_temp'] = best_sc
+thresholds['feature_softmax_temp'] = class_sc
+thresholds['mixing_value'] = best_p
+# torch.save(thresholds, 'data/models/' + name + '_thresholds.pth')
 
 print ("Saving train feats")
-torch.save({"train_labels": train_labels.detach().cpu(),
+torch.save({"train_gt": train_gt.detach().cpu(),
             "train_feats": train_feats.detach().cpu(),
-            "val_labels": targs,
+            "val_gt": targs.detach().cpu(),
             "val_feats": val_feats.detach().cpu(),
             "classes": classes,
             "thresholds": thresholds,
-            }, 'data/models/' + name + '_train_val_feats.pt')
+            }, 'data/models/' + name + '-values.pth')
 
-
-###############
-#Test
-test_preds, test_gt, test_feats, test_preds2 = get_predictions(learn.model, data.test_dl)
-preds_t = torch.softmax(best_sm_th * test_preds, dim=1)
-preds_t = torch.cat((preds_t, torch.ones_like(preds_t[:, :1])), 1)
-preds_t[:, num_classes] = best_th
-#Concat with val
-all_gt0 = torch.cat([val_gt, train_labels], dim=0)
-all_feats0 = torch.cat([val_feats, train_feats], dim=0)
-dm3 = batched_dmv(test_feats, all_feats0)
-cm3 = dm2cm(dm3, all_gt0)
-cm3 = 0.5*(2.0 - cm3)
-preds_ft_0t = cm3.clone().detach()
-preds_ft_0t[:, num_classes] = best_th_feats
-pit1 = thlist[0]*cm3 + thlist[1]*preds_ft_0t+thlist[2]*preds_t
-if SAVE_TEST_MATRIX:
-    print ("Saving test feats")
-    torch.save({"test_feats": test_feats.detach().cpu(),
-                "best_preds": pit1.detach().cpu(),
-                "classes": classes,
-                "thresholds": thresholds,
-                }, 'data/models/' + name + '_test_feats.pt')
+print ("Saving final models")
+learn.save(name)
