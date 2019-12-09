@@ -81,9 +81,9 @@ def ibeis_plugin_kaggle7_ensure_backend(ibs, container_name='flukebook_kaggle7',
         # Register depc blacklist
         prop_list = [None, 'theta', 'verts', 'species', 'name', 'yaws']
         for prop in prop_list:
-            ibs.depc_annot.register_delete_table_exclusion('Kaggle7Identification', prop)
-            ibs.depc_annot.register_delete_table_exclusion('Kaggle7Alignment',      prop)
-            ibs.depc_annot.register_delete_table_exclusion('Kaggle7Keypoint',       prop)
+            ibs.depc_annot.register_delete_table_exclusion('KaggleSevenIdentification', prop)
+            ibs.depc_annot.register_delete_table_exclusion('KaggleSevenAlignment',      prop)
+            ibs.depc_annot.register_delete_table_exclusion('KaggleSevenKeypoint',       prop)
 
         BACKEND_URLS = ibs.docker_ensure(container_name)
         if len(BACKEND_URLS) == 0:
@@ -97,7 +97,7 @@ def ibeis_plugin_kaggle7_ensure_backend(ibs, container_name='flukebook_kaggle7',
     return BACKEND_URL
 
 
-class Kaggle7ChipConfig(dt.Config):  # NOQA
+class KaggleSevenChipConfig(dt.Config):  # NOQA
     _param_info_list = [
         ut.ParamInfo('chip_padding', 32),
         ut.ParamInfo('ext', '.jpg')
@@ -114,9 +114,9 @@ def pil_image_write(absolute_path, pil_img):
 
 
 @register_preproc_annot(
-    tablename='Kaggle7Chip', parents=[ANNOTATION_TABLE],
+    tablename='KaggleSevenChip', parents=[ANNOTATION_TABLE],
     colnames=['image'], coltypes=[('extern', pil_image_load, pil_image_write)],
-    configclass=Kaggle7ChipConfig,
+    configclass=KaggleSevenChipConfig,
     fname='kaggle7',
     chunksize=128)
 def ibeis_plugin_kaggle7_chip_depc(depc, aid_list, config):
@@ -124,18 +124,18 @@ def ibeis_plugin_kaggle7_chip_depc(depc, aid_list, config):
     Refine localizations for CurvRank with Dependency Cache (depc)
 
     CommandLine:
-        python -m ibeis_kaggle7._plugin_depc --test-ibeis_plugin_kaggle7_chip_depc
-        python -m ibeis_kaggle7._plugin_depc --test-ibeis_plugin_kaggle7_chip_depc:0
+        python -m ibeis_kaggle7._plugin --test-ibeis_plugin_kaggle7_chip_depc
+        python -m ibeis_kaggle7._plugin --test-ibeis_plugin_kaggle7_chip_depc:0
 
     Example0:
         >>> # ENABLE_DOCTEST
-        >>> from ibeis_kaggle7._plugin_depc import *  # NOQA
+        >>> from ibeis_kaggle7._plugin import *  # NOQA
         >>> import ibeis
         >>> from ibeis.init import sysres
         >>> dbdir = sysres.ensure_testdb_kaggle7()
         >>> ibs = ibeis.opendb(dbdir=dbdir)
         >>> aid_list = ibs.get_image_aids(1)
-        >>> image = ibs.depc_annot.get('Kaggle7Chip', aid_list, 'image')
+        >>> image = ibs.depc_annot.get('KaggleSevenChip', aid_list, 'image')
         >>> assert ut.hash_data(image) in ['nxhumkmybgbjdjcffuneozzmptvivvlh']
     """
     ibs = depc.controller
@@ -296,7 +296,7 @@ def kaggle7_passport_src(aid=None, ibs=None, **kwargs):
 
     aid = int(aid)
     aid_list = [aid]
-    passport_paths = ibs.depc_annot.get('Kaggle7Chip', aid_list, 'image', read_extern=False, ensure=True)
+    passport_paths = ibs.depc_annot.get('KaggleSevenChip', aid_list, 'image', read_extern=False, ensure=True)
     passport_path = passport_paths[0]
 
     # Load image
@@ -361,32 +361,32 @@ def get_match_results(depc, qaid_list, daid_list, score_list, config):
         yield match_result
 
 
-class Kaggle7Config(dt.Config):  # NOQA
+class KaggleSevenConfig(dt.Config):  # NOQA
     """
     CommandLine:
-        python -m ibeis_kaggle7._plugin --test-Kaggle7Config
+        python -m ibeis_kaggle7._plugin --test-KaggleSevenConfig
 
     Example:
         >>> # ENABLE_DOCTEST
         >>> from ibeis_kaggle7._plugin import *  # NOQA
-        >>> config = Kaggle7Config()
+        >>> config = KaggleSevenConfig()
         >>> result = config.get_cfgstr()
         >>> print(result)
-        Kaggle7(dim_size=2000)
+        KaggleSeven(dim_size=2000)
     """
     def get_param_info_list(self):
         return []
 
 
-class Kaggle7Request(dt.base.VsOneSimilarityRequest):
+class KaggleSevenRequest(dt.base.VsOneSimilarityRequest):
     _symmetric = False
-    _tablename = 'Kaggle7'
+    _tablename = 'KaggleSeven'
 
     @ut.accepts_scalar_input
     def get_fmatch_overlayed_chip(request, aid_list, config=None):
         depc = request.depc
         ibs = depc.controller
-        passport_paths = ibs.depc_annot.get('Kaggle7Passport', aid_list, 'image', config=config, read_extern=False, ensure=True)
+        passport_paths = ibs.depc_annot.get('KaggleSevenPassport', aid_list, 'image', config=config, read_extern=False, ensure=True)
         passports = list(map(vt.imread, passport_paths))
         return passports
 
@@ -408,7 +408,7 @@ class Kaggle7Request(dt.base.VsOneSimilarityRequest):
 
     def execute(request, *args, **kwargs):
         # kwargs['use_cache'] = False
-        result_list = super(Kaggle7Request, request).execute(*args, **kwargs)
+        result_list = super(KaggleSevenRequest, request).execute(*args, **kwargs)
         qaids = kwargs.pop('qaids', None)
         if qaids is not None:
             result_list = [
@@ -419,10 +419,10 @@ class Kaggle7Request(dt.base.VsOneSimilarityRequest):
 
 
 @register_preproc_annot(
-    tablename='Kaggle7', parents=[ANNOTATION_TABLE, ANNOTATION_TABLE],
+    tablename='KaggleSeven', parents=[ANNOTATION_TABLE, ANNOTATION_TABLE],
     colnames=['score'], coltypes=[float],
-    configclass=Kaggle7Config,
-    requestclass=Kaggle7Request,
+    configclass=KaggleSevenConfig,
+    requestclass=KaggleSevenRequest,
     fname='kaggle7',
     rm_extern_on_delete=True,
     chunksize=None)
@@ -453,9 +453,9 @@ def ibeis_plugin_kaggle7(depc, qaid_list, daid_list, config):
         >>> qaid_list = [qaid]
         >>> daid_list = aid_list + aid_list_
         >>> root_rowids = tuple(zip(*it.product(qaid_list, daid_list)))
-        >>> config = Kaggle7Config()
+        >>> config = KaggleSevenConfig()
         >>> # Call function via request
-        >>> request = Kaggle7Request.new(depc, qaid_list, daid_list)
+        >>> request = KaggleSevenRequest.new(depc, qaid_list, daid_list)
         >>> result = request.execute()
         >>> am = result[0]
         >>> unique_nids = am.unique_nids
@@ -463,7 +463,7 @@ def ibeis_plugin_kaggle7(depc, qaid_list, daid_list, config):
         >>> unique_name_text_list = ibs.get_name_texts(unique_nids)
         >>> name_score_list_ = ['%0.04f' % (score, ) for score in am.name_score_list]
         >>> name_score_dict = dict(zip(unique_name_text_list, name_score_list_))
-        >>> print('Queried Kaggle7 algorithm for ground-truth ID = %s' % (qannot_name, ))
+        >>> print('Queried KaggleSeven algorithm for ground-truth ID = %s' % (qannot_name, ))
         >>> result = ut.repr3(name_score_dict)
         {
             '64edec9a-b998-4f96-a9d6-6dddcb8f8c0a': '0.8082',
@@ -506,7 +506,7 @@ def ibeis_plugin_kaggle7(depc, qaid_list, daid_list, config):
         assert name_counter >= 1
         annot_score = name_score / name_counter
 
-        assert name not in name_score_dict, 'Kaggle7 API response had multiple scores for name = %r' % (name, )
+        assert name not in name_score_dict, 'KaggleSeven API response had multiple scores for name = %r' % (name, )
         name_score_dict[name] = annot_score
 
     dname_list = ibs.get_annot_name_texts(daid_list)
