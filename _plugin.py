@@ -81,9 +81,8 @@ def ibeis_plugin_kaggle7_ensure_backend(ibs, container_name='flukebook_kaggle7',
         # Register depc blacklist
         prop_list = [None, 'theta', 'verts', 'species', 'name', 'yaws']
         for prop in prop_list:
+            ibs.depc_annot.register_delete_table_exclusion('KaggleSevenChip',           prop)
             ibs.depc_annot.register_delete_table_exclusion('KaggleSevenIdentification', prop)
-            ibs.depc_annot.register_delete_table_exclusion('KaggleSevenAlignment',      prop)
-            ibs.depc_annot.register_delete_table_exclusion('KaggleSevenKeypoint',       prop)
 
         BACKEND_URLS = ibs.docker_ensure(container_name)
         if len(BACKEND_URLS) == 0:
@@ -242,6 +241,76 @@ def kaggle7_chip_src(aid=None, ibs=None, **kwargs):
     img_io.seek(0)
 
     return send_file(img_io, mimetype='image/jpeg')
+
+
+def get_b64_image_str(ibs, image_filepath, **kwargs):
+    image = Image.open(image_filepath)
+    byte_buffer = BytesIO()
+    image.save(byte_buffer, format="JPEG")
+    image_base64_str = base64.b64encode(byte_buffer.getvalue()).decode("utf-8")
+    return image_base64_str
+
+
+@register_ibs_method
+def ibeis_plugin_kaggle7_identify_aid(ibs, kchip_filepath, config={}, **kwargs):
+    ut.embed()
+    url = ibs.ibeis_plugin_kaggle7_ensure_backend(**kwargs)
+    image_base64_str = get_b64_image_str(ibs, kchip_filepath, **config)
+    data = {
+        'image': image_base64_str,
+        'config': config
+    }
+    url = 'http://%s/api/classify' % (url)
+    print('Sending identify to %s' % url)
+    response = requests.post(url, json=data, timeout=120)
+    assert response.status_code == 200
+    response = response.json()
+    return response
+
+
+class KaggleSevenIdentificationConfig(dt.Config):  # NOQA
+    _param_info_list = [
+        ut.ParamInfo('model_tag', 'crc'),
+    ]
+
+
+@register_preproc_annot(
+    tablename='KaggleSevenIdentification', parents=['KaggleSevenChip'],
+    colnames=['response'], coltypes=[dict],
+    configclass=KaggleSevenIdentificationConfig,
+    fname='kaggle7',
+    chunksize=128)
+def ibeis_plugin_kaggle7_identification_depc(depc, kchip_rowid_list, config):
+    r"""
+    Refine localizations for CurvRank with Dependency Cache (depc)
+
+    CommandLine:
+        python -m ibeis_kaggle7._plugin --test-ibeis_plugin_kaggle7_identification_depc
+        python -m ibeis_kaggle7._plugin --test-ibeis_plugin_kaggle7_identification_depc:0
+
+    Example0:
+        >>> # ENABLE_DOCTEST
+        >>> from ibeis_kaggle7._plugin import *  # NOQA
+        >>> import ibeis
+        >>> from ibeis.init import sysres
+        >>> dbdir = sysres.ensure_testdb_kaggle7()
+        >>> ibs = ibeis.opendb(dbdir=dbdir)
+        >>> aid_list = ibs.get_image_aids(1)
+        >>> response = ibs.depc_annot.get('KaggleSevenIdentification', aid_list, 'response')
+        >>> image = images[0]
+        >>> assert ut.hash_data(image) in ['imlkoiskkykpbwozghmpidlqwbmglzhw']
+    """
+    ut.embed()
+
+    kchip_filepath_list = ibs.depc_annot.get('KaggleSevenChip', kchip_rowid_list, 'image', read_extern=False, ensure=True)
+
+    model_tag = config['model_tag']
+    config_ = {
+        'model_tag': model_tag,
+    }
+    for kchip_filepath in kchip_filepath_list:
+        response = ibs.ibeis_plugin_kaggle7_identify_aid(kchip_filepath, config=config_)
+        yield (response, )
 
 
 def get_match_results(depc, qaid_list, daid_list, score_list, config):
