@@ -138,114 +138,60 @@ def ibeis_plugin_kaggle7_chip_depc(depc, aid_list, config):
         >>> image = ibs.depc_annot.get('KaggleSevenChip', aid_list, 'image')
         >>> assert ut.hash_data(image) in ['nxhumkmybgbjdjcffuneozzmptvivvlh']
     """
-    ibs = depc.controller
-
-    ut.embed()
-
     padding = config['chip_padding']
 
     tips_list = depc.get('Notch_Tips', aid_list)
     size_list = depc.get('chips', aid_list, ('width', 'height'))
-    config = {
+    config_ = {
         'dim_size': 1550,
         'resize_dim': 'width',
         'ext': '.jpg',
     }
-    chip_list = depc.get('chips', aid_list, 'img', config=config, ensure=True)
-
-    color_list = [
-        (255, 0, 0),
-        (0, 0, 255),
-        (0, 255, 0),
-    ]
+    chip_list = depc.get('chips', aid_list, 'img', config=config_, ensure=True)
 
     tps = cv2.createThinPlateSplineShapeTransformer()
 
     zipped = list(zip(aid_list, tips_list, size_list, chip_list))
     for aid, tip_list, size, chip in zipped:
         h0, w0, c0 = chip.shape
-
-        size = np.array(size, dtype=np.float32)
-
         notch = tip_list[0].copy()
         left  = tip_list[1].copy()
         right = tip_list[2].copy()
 
+        size = np.array(size, dtype=np.float32)
         notch /= size
         left  /= size
         right /= size
 
         size = np.array([w0, h0], dtype=np.float32)
-
         notch *= size
         left  *= size
         right *= size
 
-        location_list = [
-            tuple(map(int, np.around(notch))),
-            tuple(map(int, np.around(left))),
-            tuple(map(int, np.around(right))),
-        ]
         chip_ = chip.copy()
-        for location, color in zip(location_list, color_list):
-            cv2.circle(chip_, location, 5, color=color)
-
-        chip_filename = 'img_aid_%d_0.png' % (aid, )
-        chip_filepath = join(notch_path, chip_filename)
-        cv2.imwrite(chip_filepath, chip_)
-
-        chip1 = chip.copy()
-        h0, w0, c0 = chip1.shape
+        h0, w0, c0 = chip_.shape
 
         left += padding
         notch += padding
         right += padding
 
-        pad = np.zeros((h0, padding, 3), dtype=chip1.dtype)
-        chip1 = np.hstack((pad, chip1, pad))
-        h, w, c = chip1.shape
-        pad = np.zeros((padding, w, 3), dtype=chip1.dtype)
-        chip1 = np.vstack((pad, chip1, pad))
-        h, w, c = chip1.shape
-
-        location_list = [
-            tuple(map(int, np.around(notch))),
-            tuple(map(int, np.around(left))),
-            tuple(map(int, np.around(right))),
-        ]
-        chip1_ = chip1.copy()
-        for location, color in zip(location_list, color_list):
-            cv2.circle(chip1_, location, 5, color=color)
-
-        chip_filename = 'img_aid_%d_1.png' % (aid, )
-        chip_filepath = join(notch_path, chip_filename)
-        cv2.imwrite(chip_filepath, chip1_)
+        pad = np.zeros((h0, padding, 3), dtype=chip_.dtype)
+        chip_ = np.hstack((pad, chip_, pad))
+        h, w, c = chip_.shape
+        pad = np.zeros((padding, w, 3), dtype=chip_.dtype)
+        chip_ = np.vstack((pad, chip_, pad))
+        h, w, c = chip_.shape
 
         delta = right - left
         radian = np.arctan2(delta[1], delta[0])
         degree = np.degrees(radian)
         M = cv2.getRotationMatrix2D((left[1], left[0]), degree, 1)
-        chip2 = cv2.warpAffine(chip1, M, (w, h), flags=cv2.INTER_LANCZOS4)
+        chip_ = cv2.warpAffine(chip_, M, (w, h), flags=cv2.INTER_LANCZOS4)
 
         H = np.vstack((M, [0, 0, 1]))
         vert_list = np.array([notch, left, right])
         vert_list_ = vt.transform_points_with_homography(H, vert_list.T).T
         notch, left, right = vert_list_
-
-        location_list = [
-            tuple(map(int, np.around(notch))),
-            tuple(map(int, np.around(left))),
-            tuple(map(int, np.around(right))),
-        ]
-        chip2_ = chip2.copy()
-        for location, color in zip(location_list, color_list):
-            cv2.circle(chip2_, location, 5, color=color)
-
-        chip_filename = 'img_aid_%d_2.png' % (aid, )
-        chip_filepath = join(notch_path, chip_filename)
-        cv2.imwrite(chip_filepath, chip2_)
-
-        tps.clear()
 
         left[0]  -= padding // 2
         left[1]  -= padding // 2
@@ -262,24 +208,13 @@ def ibeis_plugin_kaggle7_chip_depc(depc, aid_list, config):
             cv2.DMatch(1, 1, 0),
             cv2.DMatch(2, 2, 0),
         ]
+        tps.clear()
         tps.estimateTransformation(tshape, sshape, matches)
-        chip3 = tps.warpImage(chip2)
+        chip_ = tps.warpImage(chip_)
 
-        chip_filename = 'img_aid_%d_3.png' % (aid, )
-        chip_filepath = join(notch_path, chip_filename)
-        cv2.imwrite(chip_filepath, chip3)
+        chip_ = chip_[:h0, :w0, :]
 
-        chip4 = chip3[:h0, :w0, :]
-
-        chip_filename = 'img_aid_%d.png' % (aid, )
-        chip_filepath = join(notch_path, chip_filename)
-        cv2.imwrite(chip_filepath, chip4)
-
-    ibs = depc.controller
-    annot_uuid_list = ibs.get_annot_uuids(aid_list)
-    for annot_uuid in annot_uuid_list:
-        response = ibs.ibeis_plugin_kaggle7_illustration(annot_uuid, config=config)
-        yield (response, )
+        yield chip_
 
 
 @register_route('/api/plugin/kaggle7/chip/src/<aid>/', methods=['GET'], __route_prefix_check__=False, __route_authenticate__=False)
