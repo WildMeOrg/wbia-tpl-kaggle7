@@ -106,7 +106,7 @@ class KaggleSevenChipConfig(dt.Config):  # NOQA
 
 @register_preproc_annot(
     tablename='KaggleSevenChip', parents=[ANNOTATION_TABLE],
-    colnames=['image', 'image_width', 'image_height'], coltypes=[dtool.ExternType(vt.imread, vt.imwrite), int, int],
+    colnames=['image', 'image_width', 'image_height'], coltypes=[dt.ExternType(vt.imread, vt.imwrite), int, int],
     configclass=KaggleSevenChipConfig,
     fname='kaggle7',
     chunksize=128)
@@ -131,8 +131,6 @@ def ibeis_plugin_kaggle7_chip_depc(depc, aid_list, config):
         >>> ut.embed()
         >>> assert ut.hash_data(image) in ['nxhumkmybgbjdjcffuneozzmptvivvlh']
     """
-    ut.embed()
-
     padding = config['chip_padding']
 
     tips_list = depc.get('Notch_Tips', aid_list)
