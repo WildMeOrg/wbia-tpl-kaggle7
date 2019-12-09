@@ -19,7 +19,9 @@ import cv2
 
 _, register_ibs_method = controller_inject.make_ibs_register_decorator(__name__)
 register_api = controller_inject.get_ibeis_flask_api(__name__)
+register_route = controller_inject.get_ibeis_flask_route(__name__)
 register_preproc_annot = controller_inject.register_preprocs['annot']
+
 
 u"""
 Interfacing with the ACR from python is a headache, so for now we will assume that
