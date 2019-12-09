@@ -13,7 +13,7 @@ import base64
 import requests
 from PIL import Image, ImageDraw
 from io import BytesIO
-
+import cv2
 
 (print, rrr, profile) = ut.inject2(__name__)
 
@@ -26,16 +26,10 @@ Interfacing with the ACR from python is a headache, so for now we will assume th
 the docker image has already been downloaded. Command:
 
 docker pull wildme.azurecr.io/ibeis/kaggle7:latest
-
 """
 
 
-DIM_SIZE = 2000
 BACKEND_URL = None
-
-
-INDIVIDUAL_MAP_FPATH = 'https://cthulhu.dyn.wildme.io/public/random/kaggle7.flukebook.v0.csv'
-ID_MAP = None
 
 
 def _ibeis_plugin_kaggle7_check_container(url):
@@ -75,48 +69,6 @@ def _ibeis_plugin_kaggle7_check_container(url):
 
 
 docker_control.docker_register_config(None, 'flukebook_kaggle7', 'wildme.azurecr.io/ibeis/kaggle7:latest', run_args={'_internal_port': 5000, '_external_suggested_port': 5000}, container_check_func=_ibeis_plugin_kaggle7_check_container)
-# next two lines for comparing containers side-by-side
-docker_control.docker_register_config(None, 'flukebook_kaggle72', 'wildme.azurecr.io/ibeis/kaggle7:app2', run_args={'_internal_port': 5000, '_external_suggested_port': 5000}, container_check_func=_ibeis_plugin_kaggle7_check_container)
-docker_control.docker_register_config(None, 'flukebook_kaggle75', 'wildme.azurecr.io/ibeis/kaggle7:app5', run_args={'_internal_port': 5000, '_external_suggested_port': 5000}, container_check_func=_ibeis_plugin_kaggle7_check_container)
-
-
-@register_ibs_method
-def _ibeis_plugin_kaggle7_init_testdb(ibs):
-    local_path = dirname(abspath(__file__))
-    image_path = abspath(join(local_path, '..', 'example-images'))
-    assert exists(image_path)
-    gid_list = ibs.import_folder(image_path, ensure_loadable=False, ensure_exif=False)
-    uri_list = ibs.get_image_uris_original(gid_list)
-    annot_name_list = [splitext(split(uri)[1])[0] for uri in uri_list]
-    aid_list = ibs.use_images_as_annotations(gid_list)
-    ibs.set_annot_names(aid_list, annot_name_list)
-    return gid_list, aid_list
-
-
-@register_ibs_method
-def _ibeis_plugin_kaggle7_rank(ibs, response_json, desired_name):
-    ids = response_json['identification']
-    for index, result in enumerate(ids):
-        whale_id = result['whale_id']
-        flukebook_id = result.get('flukebook_id', whale_id)
-        probability = result['probability']
-        name = str(flukebook_id)
-        if name == desired_name:
-            return (index, probability)
-    return (-1, -1)
-
-
-# This method converts from the ibeis/Flukebook individual UUIDs to the Kaggle7/
-# NEAQ IDs used by the kaggle7 container.
-@register_ibs_method
-def ibeis_plugin_kaggle7_id_to_flukebook(ibs, kaggle7_id):
-    id_dict = ibs.ibeis_plugin_kaggle7_ensure_id_map()
-    if kaggle7_id not in id_dict:
-        # print warning bc we're missing a kaggle7_id from our kaggle7-flukebook map
-        # print('[WARNING]: kaggle7 id %s is missing from the kaggle7-flukebook ID map .csv' % kaggle7_id)
-        return str(kaggle7_id)
-    ans = id_dict[kaggle7_id]
-    return ans
 
 
 @register_ibs_method
@@ -143,538 +95,9 @@ def ibeis_plugin_kaggle7_ensure_backend(ibs, container_name='flukebook_kaggle7',
     return BACKEND_URL
 
 
-@register_ibs_method
-def ibeis_plugin_kaggle7_ensure_id_map(ibs, container_name='flukebook_kaggle7'):
-    global ID_MAP
-    # make sure that the container is online using docker_control functions
-    if ID_MAP is None:
-        fpath = ut.grab_file_url(INDIVIDUAL_MAP_FPATH, appname='ibeis_kaggle7', check_hash=True)
-        csv_obj = ut.CSV.from_fpath(fpath, binary=False)
-        ID_MAP = dict_from_csv(csv_obj)
-    return ID_MAP
-
-
-def dict_from_csv(csv_obj):
-    import uuid
-    id_dict = {}
-    row_list = csv_obj.row_data
-    row_list = row_list[1:]  # skip header row
-    for row in row_list:
-        kaggle7_id = row[0]
-        try:
-            kaggle7_id = int(kaggle7_id)
-        except:
-            raise ValueError('Unable to cast provided Kaggle7 id %s to an int' % kaggle7_id)
-        assert kaggle7_id not in id_dict, 'Kaggle7-to-Flukebook id map contains two entries for kaggle7 ID %s' % kaggle7_id
-
-        flukebook_id = row[1]
-        try:
-            uuid.UUID(flukebook_id)
-        except:
-            raise ValueError('Unable to cast provided Flukebook id %s to a UUID' % flukebook_id)
-        id_dict[kaggle7_id] = flukebook_id
-    return id_dict
-
-
-@register_ibs_method
-@register_api('/api/plugin/kaggle7/identify/', methods=['GET'])
-def ibeis_plugin_kaggle7_identify(ibs, annot_uuid, use_depc=True, config={}, **kwargs):
-    r"""
-    Run the Kaggle winning Right-whale kaggle7.ai ID algorithm
-
-    Args:
-        ibs         (IBEISController): IBEIS controller object
-        annot_uuid  (uuid): Annotation for ID
-
-    CommandLine:
-        python -m ibeis_kaggle7._plugin --test-ibeis_plugin_kaggle7_identify
-        python -m ibeis_kaggle7._plugin --test-ibeis_plugin_kaggle7_identify:0
-
-    Example0:
-        >>> # DISABLE_DOCTEST
-        >>> import ibeis_kaggle7
-        >>> import ibeis
-        >>> import utool as ut
-        >>> from ibeis.init import sysres
-        >>> import numpy as np
-        >>> container_name = ut.get_argval('--container', default='flukebook_kaggle7')
-        >>> print('Using container %s' % container_name)
-        >>> dbdir = sysres.ensure_testdb_identification_example()
-        >>> ibs = ibeis.opendb(dbdir=dbdir)
-        >>> gid_list, aid_list = ibs._ibeis_plugin_kaggle7_init_testdb()
-        >>> annot_uuid_list = ibs.get_annot_uuids(aid_list)
-        >>> annot_name_list = ibs.get_annot_names(aid_list)
-        >>> rank_list = []
-        >>> score_list = []
-        >>> for annot_uuid, annot_name in zip(annot_uuid_list, annot_name_list):
-        >>>     resp_json = ibs.ibeis_plugin_kaggle7_identify(annot_uuid, use_depc=False, container_name=container_name)
-        >>>     rank, score = ibs._ibeis_plugin_kaggle7_rank(resp_json, annot_name)
-        >>>     print('[instant] for whale id = %s, got rank %d with score %0.04f' % (annot_name, rank, score, ))
-        >>>     rank_list.append(rank)
-        >>>     score_list.append('%0.04f' % score)
-        >>> response_list = ibs.depc_annot.get('Kaggle7Identification', aid_list, 'response')
-        >>> rank_list_cache = []
-        >>> score_list_cache = []
-        >>> for annot_name, resp_json in zip(annot_name_list, response_list):
-        >>>     rank, score = ibs._ibeis_plugin_kaggle7_rank(resp_json, annot_name)
-        >>>     print('[cache] for whale id = %s, got rank %d with score %0.04f' % (annot_name, rank, score, ))
-        >>>     rank_list_cache.append(rank)
-        >>>     score_list_cache.append('%0.04f' % score)
-        >>> assert rank_list == rank_list_cache
-        >>> # assert score_list == score_list_cache
-        >>> result = (rank_list, score_list)
-        ([0, -1, -1, 0], ['0.9052', '-1.0000', '-1.0000', '0.6986'])
-
-    Example1:
-        >>> # DISABLE_DOCTEST
-        >>> import ibeis_kaggle7
-        >>> import ibeis
-        >>> import utool as ut
-        >>> from ibeis.init import sysres
-        >>> import numpy as np
-        >>> container_name = ut.get_argval('--container', default='flukebook_kaggle7')
-        >>> print('Using container %s' % container_name)
-        >>> dbdir = sysres.ensure_testdb_identification_example()
-        >>> ibs = ibeis.opendb(dbdir=dbdir)
-        >>> gid_list, aid_list_ = ibs._ibeis_plugin_kaggle7_init_testdb()
-        >>> aid = aid_list_[3]
-        >>> aid_list = [aid] * 10
-        >>> annot_uuid_list = ibs.get_annot_uuids(aid_list)
-        >>> annot_name_list = ibs.get_annot_names(aid_list)
-        >>> rank_list = []
-        >>> score_list = []
-        >>> for annot_uuid, annot_name in zip(annot_uuid_list, annot_name_list):
-        >>>     resp_json = ibs.ibeis_plugin_kaggle7_identify(annot_uuid, use_depc=False, container_name=container_name)
-        >>>     rank, score = ibs._ibeis_plugin_kaggle7_rank(resp_json, annot_name)
-        >>>     print('[instant] for whale id = %s, got rank %d with score %0.04f' % (annot_name, rank, score, ))
-        >>>     rank_list.append(rank)
-        >>>     score_list.append(score)
-        >>> rank_list = np.array(rank_list)
-        >>> score_list = np.array(score_list)
-        >>> print(np.min(rank_list))
-        >>> print(np.max(rank_list))
-        >>> print(np.mean(rank_list))
-        >>> print(np.std(rank_list))
-        >>> print(np.min(score_list))
-        >>> print(np.max(score_list))
-        >>> print(np.mean(score_list))
-        >>> print(np.std(score_list))
-        >>> result = (rank_list, score_list)
-        ([0, -1, -1, 0], ['0.9052', '-1.0000', '-1.0000', '0.6986'])
-    """
-    aid = aid_from_annot_uuid(ibs, annot_uuid)
-
-    if use_depc:
-        response_list = ibs.depc_annot.get('Kaggle7Identification', [aid], 'response', config=config)
-        response = response_list[0]
-    else:
-        response = ibs.ibeis_plugin_kaggle7_identify_aid(aid, config=config, **kwargs)
-    return response
-
-
-def aid_from_annot_uuid(ibs, annot_uuid):
-    annot_uuid_list = [annot_uuid]
-    ibs.web_check_uuids(qannot_uuid_list=annot_uuid_list)
-    annot_uuid_list = ensure_uuid_list(annot_uuid_list)
-    # Ensure annotations
-    aid_list = ibs.get_annot_aids_from_uuid(annot_uuid_list)
-    aid = aid_list[0]
-    return aid
-
-
-def get_b64_image(ibs, aid, **kwargs):
-    image_path = kaggle7_annot_chip_fpath(ibs, aid, **kwargs)
-    pil_image = Image.open(image_path)
-    byte_buffer = BytesIO()
-    pil_image.save(byte_buffer, format="JPEG")
-    b64_image = base64.b64encode(byte_buffer.getvalue()).decode("utf-8")
-    return b64_image
-
-
-@register_ibs_method
-def ibeis_plugin_kaggle7_identify_aid(ibs, aid, config={}, **kwargs):
-    url = ibs.ibeis_plugin_kaggle7_ensure_backend(**kwargs)
-    b64_image = get_b64_image(ibs, aid, **config)
-    data = {
-        'image': b64_image,
-        'configuration': {
-            'top_n': 100,
-            'threshold': 0.0,
-        }
-    }
-    url = 'http://%s/api/classify' % (url)
-    print('Sending identify to %s' % url)
-    response = requests.post(url, json=data, timeout=120)
-    assert response.status_code == 200
-    response = response.json()
-    response = update_response_with_flukebook_ids(ibs, response)
-    return response
-
-
-@register_ibs_method
-def ibeis_plugin_kaggle7_align_aid(ibs, aid, config={}, **kwargs):
-    url = ibs.ibeis_plugin_kaggle7_ensure_backend(**kwargs)
-    b64_image = get_b64_image(ibs, aid, **config)
-    data = {
-        'image': b64_image,
-    }
-    url = 'http://%s/api/alignment' % (url)
-    print('Sending alignment to %s' % url)
-    response = requests.post(url, json=data, timeout=120)
-    assert response.status_code == 200
-    return response.json()
-
-
-@register_ibs_method
-def ibeis_plugin_kaggle7_keypoint_aid(ibs, aid, alignment_result, config={}, **kwargs):
-    url = ibs.ibeis_plugin_kaggle7_ensure_backend(**kwargs)
-    b64_image = get_b64_image(ibs, aid, **config)
-    data = alignment_result.copy()
-    data['image'] = b64_image
-    url = 'http://%s/api/keypoints' % (url)
-    print('Sending keypoints to %s' % url)
-    response = requests.post(url, json=data, timeout=120)
-    assert response.status_code == 200
-    return response.json()
-
-
-@register_ibs_method
-@register_api('/api/plugin/kaggle7/align/', methods=['GET'])
-def ibeis_plugin_kaggle7_align(ibs, annot_uuid, use_depc=True, config={}, **kwargs):
-    r"""
-    Run the Kaggle winning Right-whale kaggle7.ai ID algorithm
-
-    Args:
-        ibs         (IBEISController): IBEIS controller object
-        annot_uuid  (uuid): Annotation for ID
-
-    CommandLine:
-        python -m ibeis_kaggle7._plugin --test-ibeis_plugin_kaggle7_align
-        python -m ibeis_kaggle7._plugin --test-ibeis_plugin_kaggle7_align:0
-
-    Example0:
-        >>> # ENABLE_DOCTEST
-        >>> import ibeis_kaggle7
-        >>> import ibeis
-        >>> import utool as ut
-        >>> from ibeis.init import sysres
-        >>> import numpy as np
-        >>> container_name = ut.get_argval('--container', default='flukebook_kaggle7')
-        >>> print('Using container %s' % container_name)
-        >>> dbdir = sysres.ensure_testdb_identification_example()
-        >>> ibs = ibeis.opendb(dbdir=dbdir)
-        >>> gid_list, aid_list = ibs._ibeis_plugin_kaggle7_init_testdb()
-        >>> annot_uuid_list = ibs.get_annot_uuids(aid_list)
-        >>> aligns_list = []
-        >>> for annot_uuid in annot_uuid_list:
-        >>>     resp_json = ibs.ibeis_plugin_kaggle7_align(annot_uuid, use_depc=False, container_name=container_name)
-        >>>     aligns_list.append(resp_json)
-        >>> aligns_list_cache = ibs.depc_annot.get('Kaggle7Alignment', aid_list, 'response')
-        >>> assert aligns_list == aligns_list_cache
-        >>> result = aligns_list_cache
-        [{'localization': {'bbox1': {'x': 994, 'y': 612}, 'bbox2': {'x': 1511, 'y': 1160}}}, {'localization': {'bbox1': {'x': 0, 'y': 408}, 'bbox2': {'x': 1128, 'y': 727}}}, {'localization': {'bbox1': {'x': 2376, 'y': 404}, 'bbox2': {'x': 3681, 'y': 1069}}}, {'localization': {'bbox1': {'x': 822, 'y': 408}, 'bbox2': {'x': 1358, 'y': 956}}}]
-    """
-    aid = aid_from_annot_uuid(ibs, annot_uuid)
-
-    if use_depc:
-        response_list = ibs.depc_annot.get('Kaggle7Alignment', [aid], 'response', config=config)
-        response = response_list[0]
-    else:
-        response = ibs.ibeis_plugin_kaggle7_align_aid(aid, config=config, **kwargs)
-    return response
-
-
-@register_ibs_method
-@register_api('/api/plugin/kaggle7/keypoint/', methods=['GET'])
-def ibeis_plugin_kaggle7_keypoint(ibs, annot_uuid, use_depc=True, config={}, **kwargs):
-    r"""
-    Run the Kaggle winning Right-whale kaggle7.ai ID algorithm
-
-    Args:
-        ibs         (IBEISController): IBEIS controller object
-        annot_uuid  (uuid): Annotation for ID
-
-    CommandLine:
-        python -m ibeis_kaggle7._plugin --test-ibeis_plugin_kaggle7_keypoint
-        python -m ibeis_kaggle7._plugin --test-ibeis_plugin_kaggle7_keypoint:0
-
-    Example0:
-        >>> # ENABLE_DOCTEST
-        >>> import ibeis_kaggle7
-        >>> import ibeis
-        >>> import utool as ut
-        >>> from ibeis.init import sysres
-        >>> import numpy as np
-        >>> container_name = ut.get_argval('--container', default='flukebook_kaggle7')
-        >>> print('Using container %s' % container_name)
-        >>> dbdir = sysres.ensure_testdb_identification_example()
-        >>> ibs = ibeis.opendb(dbdir=dbdir)
-        >>> gid_list, aid_list = ibs._ibeis_plugin_kaggle7_init_testdb()
-        >>> annot_uuid_list = ibs.get_annot_uuids(aid_list)
-        >>> viewpoint_list = []
-        >>> for annot_uuid in annot_uuid_list:
-        >>>     resp_json = ibs.ibeis_plugin_kaggle7_keypoint(annot_uuid, use_depc=False, container_name=container_name)
-        >>>     viewpoint_list.append(resp_json)
-        >>> viewpoint_list_cache = ibs.depc_annot.get('Kaggle7Keypoint', aid_list, 'response')
-        >>> assert viewpoint_list == viewpoint_list_cache
-        >>> result = viewpoint_list_cache
-        [{'keypoints': {'blowhead': {'x': 1357, 'y': 963}, 'bonnet': {'x': 1151, 'y': 804}, 'angle': -142.33743653326957}}, {'keypoints': {'blowhead': {'x': 0, 'y': 724}, 'bonnet': {'x': 757, 'y': 477}, 'angle': -18.070882049942213}}, {'keypoints': {'blowhead': {'x': 3497, 'y': 404}, 'bonnet': {'x': 2875, 'y': 518}, 'angle': -190.38588712124752}}, {'keypoints': {'blowhead': {'x': 1098, 'y': 784}, 'bonnet': {'x': 1115, 'y': 523}, 'angle': -86.27335507676072}}]
-
-    """
-    aid = aid_from_annot_uuid(ibs, annot_uuid)
-
-    if use_depc:
-        # TODO: depc version
-        response_list = ibs.depc_annot.get('Kaggle7Keypoint', [aid], 'response')
-        response = response_list[0]
-    else:
-        alignment = ibs.ibeis_plugin_kaggle7_align_aid(aid, config=config, **kwargs)
-        response  = ibs.ibeis_plugin_kaggle7_keypoint_aid(aid, alignment, config=config, **kwargs)
-    return response
-
-
-def kaggle7_annot_chip_fpath(ibs, aid, dim_size=DIM_SIZE, **kwargs):
-
-    gid = ibs.get_annot_gids(aid)
-    w, h = ibs.get_image_sizes(gid)
-    xtl, ytl, w_, h_ = ibs.get_annot_bboxes(aid)
-    image_area = w * h
-    if image_area <= 1:
-        image_area = -1
-    annot_area = w_ * h_
-    coverage = annot_area / image_area
-    trivial = coverage >= 0.99
-    print('[Kaggle7] Trivial config?: %r (area percentage = %0.02f)' % (trivial, coverage, ))
-
-    if trivial:
-        config = {
-            'dim_size': dim_size,
-            'resize_dim': 'area',
-            'ext': '.jpg',
-        }
-    else:
-        config = {
-            'dim_size': dim_size // 2,
-            'resize_dim': 'area',
-            'pad': 0.99,
-            'ext': '.jpg',
-        }
-    print('[Kaggle7] Using chip_fpath config = %s' % (ut.repr3(config), ))
-
-    fpath = ibs.get_annot_chip_fpath(aid, ensure=True, config2_=config)
-    return fpath
-
-
-@register_ibs_method
-def ibeis_plugin_kaggle7_illustration(ibs, annot_uuid, output=False, config={}, **kwargs):
-    r"""
-    Run the illustration examples
-
-    Args:
-        ibs         (IBEISController): IBEIS controller object
-        annot_uuid  (uuid): Annotation for ID
-
-    CommandLine:
-        python -m ibeis_kaggle7._plugin --test-ibeis_plugin_kaggle7_illustration
-        python -m ibeis_kaggle7._plugin --test-ibeis_plugin_kaggle7_illustration:0
-
-    Example0:
-        >>> # ENABLE_DOCTEST
-        >>> import ibeis_kaggle7
-        >>> import ibeis
-        >>> import utool as ut
-        >>> from ibeis.init import sysres
-        >>> import numpy as np
-        >>> container_name = ut.get_argval('--container', default='flukebook_kaggle7')
-        >>> print('Using container %s' % container_name)
-        >>> dbdir = sysres.ensure_testdb_identification_example()
-        >>> ibs = ibeis.opendb(dbdir=dbdir)
-        >>> gid_list, aid_list = ibs._ibeis_plugin_kaggle7_init_testdb()
-        >>> annot_uuid_list = ibs.get_annot_uuids(aid_list)
-        >>> for annot_uuid in annot_uuid_list:
-        >>>     output_filepath_list = ibs.ibeis_plugin_kaggle7_illustration(annot_uuid)
-    """
-    alignment = ibs.ibeis_plugin_kaggle7_align(annot_uuid, config=config)
-    keypoints = ibs.ibeis_plugin_kaggle7_keypoint(annot_uuid, config=config)
-    aid = aid_from_annot_uuid(ibs, annot_uuid)
-    image_path = kaggle7_annot_chip_fpath(ibs, aid, **config)
-    # TODO write this func
-    #image_path = ibs.get_kaggle7_chip_fpath(aid)
-    pil_img = Image.open(image_path)
-    # draw a red box based on alignment on pil_image
-    draw = ImageDraw.Draw(pil_img)
-    # draw.rectangle(((0, 00), (100, 100)), fill="black")
-    draw.rectangle(
-        (
-            (alignment['localization']['bbox1']['x'], alignment['localization']['bbox1']['y']),
-            (alignment['localization']['bbox2']['x'], alignment['localization']['bbox2']['y']),
-        ),
-        outline='red',
-        width=5,
-    )
-
-    blowhead = (keypoints['keypoints']['blowhead']['x'], keypoints['keypoints']['blowhead']['y'])
-    blowhead_btm, blowhead_top = bounding_box_at_centerpoint(blowhead)
-    draw.ellipse( (blowhead_btm, blowhead_top), outline="green", width=5)
-
-    bonnet = (keypoints['keypoints']['bonnet']['x'], keypoints['keypoints']['bonnet']['y'])
-    bonnet_btm, bonnet_top = bounding_box_at_centerpoint(bonnet)
-    draw.ellipse( (bonnet_btm, bonnet_top), outline="blue", width=5)
-
-    if output:
-        local_path = dirname(abspath(__file__))
-        output_path = abspath(join(local_path, '..', '_output'))
-        ut.ensuredir(output_path)
-        output_filepath_fmtstr = join(output_path, 'illustration-%s.jpg')
-        output_filepath = output_filepath_fmtstr % (annot_uuid, )
-        print('Writing to %s' % (output_filepath, ))
-        pil_img.save(output_filepath)
-
-    return pil_img
-
-
-@register_ibs_method
-def ibeis_plugin_kaggle7_passport(ibs, annot_uuid, output=False, config={}, **kwargs):
-    keypoints = ibs.ibeis_plugin_kaggle7_keypoint(annot_uuid, config=config)
-    aid = aid_from_annot_uuid(ibs, annot_uuid)
-    image_path = kaggle7_annot_chip_fpath(ibs, aid, **config)
-    # TODO write this func
-    #image_path = ibs.get_kaggle7_chip_fpath(aid)
-    pil_img = Image.open(image_path)
-
-    # add padding on all sides of the image to prevent cutoff
-    orig_size_np = np.array(pil_img.size)
-    new_size = tuple(orig_size_np * 3)
-    canvas = Image.new("RGB", new_size)
-    canvas.paste(pil_img, pil_img.size)
-
-    # get new coords of the blowhead and bonnet to use for rotation
-    blowhead_np = np.array((keypoints['keypoints']['blowhead']['x'], keypoints['keypoints']['blowhead']['y']))
-    blowhead_np += orig_size_np
-    bonnet_np = np.array((keypoints['keypoints']['bonnet']['x'], keypoints['keypoints']['bonnet']['y']))
-    bonnet_np += orig_size_np
-    bonnet = tuple(bonnet_np)
-
-    # rotate along the whale's axis
-    angle = keypoints['keypoints']['angle']
-    angle -= 90.0  # kaggle7 is left-aligned by default, we prefer top-aligned
-    # translate coords are the difference from the blowhold to the center of the image
-    blowhole = bonnet_np
-    center = orig_size_np * 1.5
-    translate = tuple(center - blowhole)
-    canvas = canvas.rotate(angle, center=bonnet, translate=translate, resample=Image.NEAREST)
-
-    # crop down to a square around the keypoints
-    axis_line = blowhead_np - bonnet_np
-    unit_size = np.hypot(axis_line[0], axis_line[1])
-    crop_1 = center - np.array((unit_size, 1.5 * unit_size))
-    crop_2 = center + np.array((unit_size, 0.5 * unit_size))
-    # PIL.Image.crop needs a 4-tuple of ints for the crop function
-    crop_box = tuple(np.concatenate((crop_1, crop_2)).astype(int))
-    canvas = canvas.crop(crop_box)
-
-    # resize the image to standard
-    square_size = 1000
-    canvas = canvas.resize((square_size, square_size), resample=Image.LANCZOS)
-    # now draw ellipses on the blowhole and bonnet.
-    # because of the rotation, centering, and now resizing, we know these will always be in the exact same pixel location
-    draw = ImageDraw.Draw(canvas)
-    bonnet_coords = bounding_box_at_centerpoint((square_size / 2, square_size / 4))
-    draw.ellipse( bonnet_coords, outline="green", width=2)
-    blowhole_coords = bounding_box_at_centerpoint((square_size / 2, square_size * 3 / 4))
-    draw.ellipse( blowhole_coords, outline="blue", width=2)
-
-    if output:
-        local_path = dirname(abspath(__file__))
-        output_path = abspath(join(local_path, '..', '_output'))
-        ut.ensuredir(output_path)
-        output_filepath_fmtstr = join(output_path, 'passport-%s.jpg')
-        output_filepath = output_filepath_fmtstr % (annot_uuid, )
-        print('Writing to %s' % (output_filepath, ))
-        canvas.save(output_filepath)
-
-    return canvas
-
-
-def bounding_box_at_centerpoint(point, radius=15):
-    point_less = tuple(coord - radius for coord in point)
-    point_more = tuple(coord + radius for coord in point)
-    return (point_less, point_more)
-
-
-def update_response_with_flukebook_ids(ibs, response):
-    for score_dict in response['identification']:
-        kaggle7_id = score_dict['whale_id']
-        flukebook_id = ibs.ibeis_plugin_kaggle7_id_to_flukebook(kaggle7_id)
-        score_dict['flukebook_id'] = flukebook_id
-    return response
-
-
-class Kaggle7IdentificationConfig(dt.Config):  # NOQA
+class Kaggle7ChipConfig(dt.Config):  # NOQA
     _param_info_list = [
-        ut.ParamInfo('dim_size', DIM_SIZE),
-    ]
-
-
-@register_preproc_annot(
-    tablename='Kaggle7Identification', parents=[ANNOTATION_TABLE],
-    colnames=['response'], coltypes=[dict],
-    configclass=Kaggle7IdentificationConfig,
-    fname='kaggle7',
-    chunksize=4)
-def ibeis_plugin_kaggle7_identify_kaggle7_ids_depc(depc, aid_list, config):
-    # The doctest for ibeis_plugin_kaggle7_identify_kaggle7_ids also covers this func
-    ibs = depc.controller
-    for aid in aid_list:
-        response = ibs.ibeis_plugin_kaggle7_identify_aid(aid, config=config)
-        yield (response, )
-
-
-class Kaggle7AlignmentConfig(dt.Config):  # NOQA
-    _param_info_list = [
-        ut.ParamInfo('dim_size', DIM_SIZE),
-    ]
-
-
-@register_preproc_annot(
-    tablename='Kaggle7Alignment', parents=[ANNOTATION_TABLE],
-    colnames=['response'], coltypes=[dict],
-    configclass=Kaggle7AlignmentConfig,
-    fname='kaggle7',
-    chunksize=128)
-def ibeis_plugin_kaggle7_align_kaggle7_ids_depc(depc, aid_list, config):
-    # The doctest for ibeis_plugin_kaggle7_identify_kaggle7_ids also covers this func
-    ibs = depc.controller
-    for aid in aid_list:
-        response = ibs.ibeis_plugin_kaggle7_align_aid(aid, config=config)
-        yield (response, )
-
-
-class Kaggle7KeypointsConfig(dt.Config):  # NOQA
-    _param_info_list = [
-        ut.ParamInfo('dim_size', DIM_SIZE),
-    ]
-
-
-@register_preproc_annot(
-    tablename='Kaggle7Keypoint', parents=['Kaggle7Alignment'],
-    colnames=['response'], coltypes=[dict],
-    configclass=Kaggle7KeypointsConfig,
-    fname='kaggle7',
-    chunksize=128)
-def ibeis_plugin_kaggle7_keypoint_kaggle7_ids_depc(depc, alignment_rowids, config):
-    # The doctest for ibeis_plugin_kaggle7_identify_kaggle7_ids also covers this func
-    ibs = depc.controller
-    alignments = depc.get_native('Kaggle7Alignment', alignment_rowids, 'response')
-    aid_list = depc.get_ancestor_rowids('Kaggle7Alignment', alignment_rowids)
-    for alignment, aid in zip(alignments, aid_list):
-        response = ibs.ibeis_plugin_kaggle7_keypoint_aid(aid, alignment, config=config)
-        yield (response, )
-
-
-class Kaggle7IllustrationConfig(dt.Config):  # NOQA
-    _param_info_list = [
-        ut.ParamInfo('dim_size', DIM_SIZE),
+        ut.ParamInfo('chip_padding', 32),
         ut.ParamInfo('ext', '.jpg')
     ]
 
@@ -689,13 +112,167 @@ def pil_image_write(absolute_path, pil_img):
 
 
 @register_preproc_annot(
-    tablename='Kaggle7Illustration', parents=[ANNOTATION_TABLE],
+    tablename='Kaggle7Chip', parents=[ANNOTATION_TABLE],
     colnames=['image'], coltypes=[('extern', pil_image_load, pil_image_write)],
-    configclass=Kaggle7IllustrationConfig,
+    configclass=Kaggle7ChipConfig,
     fname='kaggle7',
     chunksize=128)
-def ibeis_plugin_kaggle7_illustrate_kaggle7_ids_depc(depc, aid_list, config):
-    # The doctest for ibeis_plugin_kaggle7_identify_kaggle7_ids also covers this func
+def ibeis_plugin_kaggle7_chip_depc(depc, aid_list, config):
+    r"""
+    Refine localizations for CurvRank with Dependency Cache (depc)
+
+    CommandLine:
+        python -m ibeis_kaggle7._plugin_depc --test-ibeis_plugin_kaggle7_chip_depc
+        python -m ibeis_kaggle7._plugin_depc --test-ibeis_plugin_kaggle7_chip_depc:0
+
+    Example0:
+        >>> # ENABLE_DOCTEST
+        >>> from ibeis_kaggle7._plugin_depc import *  # NOQA
+        >>> import ibeis
+        >>> from ibeis.init import sysres
+        >>> dbdir = sysres.ensure_testdb_kaggle7()
+        >>> ibs = ibeis.opendb(dbdir=dbdir)
+        >>> aid_list = ibs.get_image_aids(1)
+        >>> image = ibs.depc_annot.get('Kaggle7Chip', aid_list, 'image')
+        >>> assert ut.hash_data(image) in ['nxhumkmybgbjdjcffuneozzmptvivvlh']
+    """
+    ibs = depc.controller
+
+    ut.embed()
+
+    padding = config['chip_padding']
+
+    tips_list = depc.get('Notch_Tips', aid_list)
+    size_list = depc.get('chips', aid_list, ('width', 'height'))
+    config = {
+        'dim_size': 1550,
+        'resize_dim': 'width',
+        'ext': '.jpg',
+    }
+    chip_list = depc.get('chips', aid_list, 'img', config=config, ensure=True)
+
+    color_list = [
+        (255, 0, 0),
+        (0, 0, 255),
+        (0, 255, 0),
+    ]
+
+    tps = cv2.createThinPlateSplineShapeTransformer()
+
+    zipped = list(zip(aid_list, tips_list, size_list, chip_list))
+    for aid, tip_list, size, chip in zipped:
+        h0, w0, c0 = chip.shape
+
+        size = np.array(size, dtype=np.float32)
+
+        notch = tip_list[0].copy()
+        left  = tip_list[1].copy()
+        right = tip_list[2].copy()
+
+        notch /= size
+        left  /= size
+        right /= size
+
+        size = np.array([w0, h0], dtype=np.float32)
+
+        notch *= size
+        left  *= size
+        right *= size
+
+        location_list = [
+            tuple(map(int, np.around(notch))),
+            tuple(map(int, np.around(left))),
+            tuple(map(int, np.around(right))),
+        ]
+        chip_ = chip.copy()
+        for location, color in zip(location_list, color_list):
+            cv2.circle(chip_, location, 5, color=color)
+
+        chip_filename = 'img_aid_%d_0.png' % (aid, )
+        chip_filepath = join(notch_path, chip_filename)
+        cv2.imwrite(chip_filepath, chip_)
+
+        chip1 = chip.copy()
+        h0, w0, c0 = chip1.shape
+
+        left += padding
+        notch += padding
+        right += padding
+
+        pad = np.zeros((h0, padding, 3), dtype=chip1.dtype)
+        chip1 = np.hstack((pad, chip1, pad))
+        h, w, c = chip1.shape
+        pad = np.zeros((padding, w, 3), dtype=chip1.dtype)
+        chip1 = np.vstack((pad, chip1, pad))
+        h, w, c = chip1.shape
+
+        location_list = [
+            tuple(map(int, np.around(notch))),
+            tuple(map(int, np.around(left))),
+            tuple(map(int, np.around(right))),
+        ]
+        chip1_ = chip1.copy()
+        for location, color in zip(location_list, color_list):
+            cv2.circle(chip1_, location, 5, color=color)
+
+        chip_filename = 'img_aid_%d_1.png' % (aid, )
+        chip_filepath = join(notch_path, chip_filename)
+        cv2.imwrite(chip_filepath, chip1_)
+
+        delta = right - left
+        radian = np.arctan2(delta[1], delta[0])
+        degree = np.degrees(radian)
+        M = cv2.getRotationMatrix2D((left[1], left[0]), degree, 1)
+        chip2 = cv2.warpAffine(chip1, M, (w, h), flags=cv2.INTER_LANCZOS4)
+
+        H = np.vstack((M, [0, 0, 1]))
+        vert_list = np.array([notch, left, right])
+        vert_list_ = vt.transform_points_with_homography(H, vert_list.T).T
+        notch, left, right = vert_list_
+
+        location_list = [
+            tuple(map(int, np.around(notch))),
+            tuple(map(int, np.around(left))),
+            tuple(map(int, np.around(right))),
+        ]
+        chip2_ = chip2.copy()
+        for location, color in zip(location_list, color_list):
+            cv2.circle(chip2_, location, 5, color=color)
+
+        chip_filename = 'img_aid_%d_2.png' % (aid, )
+        chip_filepath = join(notch_path, chip_filename)
+        cv2.imwrite(chip_filepath, chip2_)
+
+        tps.clear()
+
+        left[0]  -= padding // 2
+        left[1]  -= padding // 2
+        notch[1] += padding // 2
+        right[0] += padding // 2
+        right[1] -= padding // 2
+
+        sshape = np.array([left, notch, right], np.float32)
+        tshape = np.array([[0, 0], [w0 // 2, h0], [w0, 0]], np.float32)
+        sshape = sshape.reshape(1, -1, 2)
+        tshape = tshape.reshape(1, -1, 2)
+        matches = [
+            cv2.DMatch(0, 0, 0),
+            cv2.DMatch(1, 1, 0),
+            cv2.DMatch(2, 2, 0),
+        ]
+        tps.estimateTransformation(tshape, sshape, matches)
+        chip3 = tps.warpImage(chip2)
+
+        chip_filename = 'img_aid_%d_3.png' % (aid, )
+        chip_filepath = join(notch_path, chip_filename)
+        cv2.imwrite(chip_filepath, chip3)
+
+        chip4 = chip3[:h0, :w0, :]
+
+        chip_filename = 'img_aid_%d.png' % (aid, )
+        chip_filepath = join(notch_path, chip_filename)
+        cv2.imwrite(chip_filepath, chip4)
+
     ibs = depc.controller
     annot_uuid_list = ibs.get_annot_uuids(aid_list)
     for annot_uuid in annot_uuid_list:
@@ -703,26 +280,39 @@ def ibeis_plugin_kaggle7_illustrate_kaggle7_ids_depc(depc, aid_list, config):
         yield (response, )
 
 
-class Kaggle7PassportConfig(dt.Config):  # NOQA
-    _param_info_list = [
-        ut.ParamInfo('dim_size', DIM_SIZE),
-        ut.ParamInfo('ext', '.jpg')
-    ]
+@register_route('/api/plugin/kaggle7/chip/src/<aid>/', methods=['GET'], __route_prefix_check__=False, __route_authenticate__=False)
+def kaggle7_passport_src(aid=None, ibs=None, **kwargs):
+    from six.moves import cStringIO as StringIO
+    from io import BytesIO
+    from PIL import Image  # NOQA
+    from flask import current_app, send_file
+    from ibeis.web import appfuncs as appf
+    import six
 
+    if ibs is None:
+        ibs = current_app.ibs
 
-@register_preproc_annot(
-    tablename='Kaggle7Passport', parents=[ANNOTATION_TABLE],
-    colnames=['image'], coltypes=[('extern', pil_image_load, pil_image_write)],
-    configclass=Kaggle7PassportConfig,
-    fname='kaggle7',
-    chunksize=128)
-def ibeis_plugin_kaggle7_passport_kaggle7_ids_depc(depc, aid_list, config):
-    # The doctest for ibeis_plugin_kaggle7_identify_kaggle7_ids also covers this func
-    ibs = depc.controller
-    annot_uuid_list = ibs.get_annot_uuids(aid_list)
-    for annot_uuid in annot_uuid_list:
-        response = ibs.ibeis_plugin_kaggle7_passport(annot_uuid, config=config)
-        yield (response, )
+    aid = int(aid)
+    aid_list = [aid]
+    passport_paths = ibs.depc_annot.get('Kaggle7Chip', aid_list, 'image', read_extern=False, ensure=True)
+    passport_path = passport_paths[0]
+
+    # Load image
+    assert passport_paths is not None, 'passport path should not be None'
+    image = vt.imread(passport_path, orient='auto')
+    image = appf.resize_via_web_parameters(image)
+    image = image[:, :, ::-1]
+
+    # Encode image
+    image_pil = Image.fromarray(image)
+    if six.PY2:
+        img_io = StringIO()
+    else:
+        img_io = BytesIO()
+    image_pil.save(img_io, 'JPEG', quality=100)
+    img_io.seek(0)
+
+    return send_file(img_io, mimetype='image/jpeg')
 
 
 def get_match_results(depc, qaid_list, daid_list, score_list, config):
@@ -783,9 +373,7 @@ class Kaggle7Config(dt.Config):  # NOQA
         Kaggle7(dim_size=2000)
     """
     def get_param_info_list(self):
-        return [
-            ut.ParamInfo('dim_size', DIM_SIZE),
-        ]
+        return []
 
 
 class Kaggle7Request(dt.base.VsOneSimilarityRequest):
