@@ -128,8 +128,6 @@ def ibeis_plugin_kaggle7_chip_depc(depc, aid_list, config):
         >>> aid_list = ibs.get_image_aids(1)
         >>> images = ibs.depc_annot.get('KaggleSevenChip', aid_list, 'image')
         >>> image = images[0]
-        >>> import utool as ut
-        >>> ut.embed()
         >>> assert ut.hash_data(image) in ['imlkoiskkykpbwozghmpidlqwbmglzhw']
     """
     padding = config['chip_padding']
