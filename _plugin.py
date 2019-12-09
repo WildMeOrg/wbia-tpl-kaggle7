@@ -211,9 +211,8 @@ def ibeis_plugin_kaggle7_chip_depc(depc, aid_list, config):
 
 
 @register_route('/api/plugin/kaggle7/chip/src/<aid>/', methods=['GET'], __route_prefix_check__=False, __route_authenticate__=False)
-def kaggle7_passport_src(aid=None, ibs=None, **kwargs):
+def kaggle7_chip_src(aid=None, ibs=None, **kwargs):
     from six.moves import cStringIO as StringIO
-    from io import BytesIO
     from PIL import Image  # NOQA
     from flask import current_app, send_file
     from ibeis.web import appfuncs as appf
@@ -224,12 +223,12 @@ def kaggle7_passport_src(aid=None, ibs=None, **kwargs):
 
     aid = int(aid)
     aid_list = [aid]
-    passport_paths = ibs.depc_annot.get('KaggleSevenChip', aid_list, 'image', read_extern=False, ensure=True)
-    passport_path = passport_paths[0]
+    chip_paths = ibs.depc_annot.get('KaggleSevenChip', aid_list, 'image', read_extern=False, ensure=True)
+    chip_path = chip_paths[0]
 
     # Load image
-    assert passport_paths is not None, 'passport path should not be None'
-    image = vt.imread(passport_path, orient='auto')
+    assert chip_paths is not None, 'chip path should not be None'
+    image = vt.imread(chip_path, orient='auto')
     image = appf.resize_via_web_parameters(image)
     image = image[:, :, ::-1]
 
@@ -314,9 +313,9 @@ class KaggleSevenRequest(dt.base.VsOneSimilarityRequest):
     def get_fmatch_overlayed_chip(request, aid_list, config=None):
         depc = request.depc
         ibs = depc.controller
-        passport_paths = ibs.depc_annot.get('KaggleSevenPassport', aid_list, 'image', config=config, read_extern=False, ensure=True)
-        passports = list(map(vt.imread, passport_paths))
-        return passports
+        chip_paths = ibs.depc_annot.get('KaggleSevenChip', aid_list, 'image', config=config, read_extern=False, ensure=True)
+        chips = list(map(vt.imread, chip_paths))
+        return chips
 
     def render_single_result(request, cm, aid, **kwargs):
         # HACK FOR WEB VIEWER
