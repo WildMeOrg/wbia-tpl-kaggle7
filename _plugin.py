@@ -106,7 +106,7 @@ class KaggleSevenChipConfig(dt.Config):  # NOQA
 
 @register_preproc_annot(
     tablename='KaggleSevenChip', parents=[ANNOTATION_TABLE],
-    colnames=['image', 'image_width', 'image_height'], coltypes=[('extern', np.load, np.save), int, int],
+    colnames=['image', 'image_width', 'image_height'], coltypes=[dtool.ExternType(vt.imread, vt.imwrite), int, int],
     configclass=KaggleSevenChipConfig,
     fname='kaggle7',
     chunksize=128)
