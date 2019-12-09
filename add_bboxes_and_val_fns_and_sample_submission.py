@@ -25,12 +25,12 @@ valid_df_id_set = set(valid_df.Id)
 test_df_id_set  = set(valid_df.Id)
 
 assert len(train_df_image_set & valid_df_image_set) == 0
-assert len(train_df_image_set & test_df_image_set)  == 0
-assert len(valid_df_image_set & test_df_image_set)  == 0
+# assert len(train_df_image_set & test_df_image_set)  == 0
+# assert len(valid_df_image_set & test_df_image_set)  == 0
 
 assert train_df_id_set | valid_df_id_set == train_df_id_set
-assert train_df_id_set | test_df_id_set  == valid_df_id_set
-assert valid_df_id_set | test_df_id_set  == valid_df_id_set
+# assert train_df_id_set | test_df_id_set  == valid_df_id_set
+# assert valid_df_id_set | test_df_id_set  == valid_df_id_set
 
 df = pd.concat([train_df, valid_df], ignore_index=True)
 
