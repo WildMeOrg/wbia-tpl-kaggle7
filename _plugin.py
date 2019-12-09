@@ -131,6 +131,8 @@ def ibeis_plugin_kaggle7_chip_depc(depc, aid_list, config):
         >>> ut.embed()
         >>> assert ut.hash_data(image) in ['nxhumkmybgbjdjcffuneozzmptvivvlh']
     """
+    ut.embed()
+
     padding = config['chip_padding']
 
     tips_list = depc.get('Notch_Tips', aid_list)
