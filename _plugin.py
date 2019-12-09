@@ -104,18 +104,9 @@ class KaggleSevenChipConfig(dt.Config):  # NOQA
     ]
 
 
-def pil_image_load(absolute_path):
-    pil_img = Image.open(absolute_path)
-    return pil_img
-
-
-def pil_image_write(absolute_path, pil_img):
-    pil_img.save(absolute_path)
-
-
 @register_preproc_annot(
     tablename='KaggleSevenChip', parents=[ANNOTATION_TABLE],
-    colnames=['image'], coltypes=[('extern', pil_image_load, pil_image_write)],
+    colnames=['image', 'image_width', 'image_height'], coltypes=[('extern', np.load, np.save), int, int],
     configclass=KaggleSevenChipConfig,
     fname='kaggle7',
     chunksize=128)
@@ -136,6 +127,8 @@ def ibeis_plugin_kaggle7_chip_depc(depc, aid_list, config):
         >>> ibs = ibeis.opendb(dbdir=dbdir)
         >>> aid_list = ibs.get_image_aids(1)
         >>> image = ibs.depc_annot.get('KaggleSevenChip', aid_list, 'image')
+        >>> import utool as ut
+        >>> ut.embed()
         >>> assert ut.hash_data(image) in ['nxhumkmybgbjdjcffuneozzmptvivvlh']
     """
     padding = config['chip_padding']
@@ -213,8 +206,9 @@ def ibeis_plugin_kaggle7_chip_depc(depc, aid_list, config):
         chip_ = tps.warpImage(chip_)
 
         chip_ = chip_[:h0, :w0, :]
+        chip_h, chip_w = chip_.shape[:2]
 
-        yield chip_
+        yield (chip_, chip_w, chip_h, )
 
 
 @register_route('/api/plugin/kaggle7/chip/src/<aid>/', methods=['GET'], __route_prefix_check__=False, __route_authenticate__=False)
