@@ -1,6 +1,6 @@
-from flask import Flask, request
+from flask import Flask
 from flask_restful import Api, Resource, reqparse
-from train_VGG16 import network_model
+from arch import make_new_network
 from io import BytesIO
 from PIL import Image
 import utool as ut
@@ -10,6 +10,8 @@ import torch
 
 APP = Flask(__name__)
 API = Api(APP)
+
+NETWORK = None
 
 model_url_dict = {
     'crc': 'https://cthulhu.dyn.wildme.io/public/models/kaggle7.crc.final.pth',
@@ -51,7 +53,10 @@ class Kaggle7(Resource):
             model_weights = torch.load(model_filepath)
             model_values = torch.load(values_filepath)
 
-            initialized = learn.model.module.state_dict()
+            num_classes = len(set(df.Id))
+            network_model = make_new_network(num_classes, RING_HEADS, GEM_CONST)
+
+            initialized = network_model.module.state_dict()
 
             data = (
                 ImageListGray

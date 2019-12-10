@@ -27,17 +27,7 @@ SEED = 0
 RING_HEADS = 4
 GEM_CONST = 5.0
 
-
-print("torch.cuda.is_available:", torch.cuda.is_available())
-
-name = f'DenseNet201-GeM-{GEM_CONST}-PCB{RING_HEADS}-{SZH}-{SZW}-Ring-{RING_ALPHA}_RELU'
-
-network_model = CustomPCBNetwork(torchvision.models.densenet201(pretrained=True), RING_HEADS, GEM_CONST)
-
-if torch.cuda.device_count() > 1:
-    print("Using", torch.cuda.device_count(), "GPUs!")
-    network_model = nn.DataParallel(network_model)
-
+NAME = f'DenseNet201-GeM-{GEM_CONST}-PCB{RING_HEADS}-{SZH}-{SZW}-Ring-{RING_ALPHA}_RELU'
 
 if __name__ == '__main__':
     df = pd.read_csv('data/train.csv')
@@ -73,6 +63,7 @@ if __name__ == '__main__':
     path2fn = lambda path: re.search('[\w-]*\.jpg$', path).group(0)
 
     num_classes = len(set(df.Id))
+    network_model = make_new_network(num_classes, RING_HEADS, GEM_CONST)
 
     tfms = (
         [
@@ -181,9 +172,9 @@ if __name__ == '__main__':
 
     for round_num, (max_lr_, num_epochs_) in enumerate(max_lr_epochs_list):
         print ("Round %d training (freeze)" % (round_num + 1, ))
-        name_ = '%s-R%s-freeze' % (name, round_num, )
+        name = '%s-R%s-freeze' % (NAME, round_num, )
         try:
-            learn.load(name_)
+            learn.load(name)
         except:
             learn.freeze()
 
@@ -197,12 +188,12 @@ if __name__ == '__main__':
             # print('Found max_lr = %0.08f, using %0.08f' % (max_lr, max_lr_))
             # # Train
             learn.fit_one_cycle(num_epochs_, max_lr_)
-            learn.save(name_)
+            learn.save(name)
 
         print ("Round %d training (unfreeze)" % (round_num + 1, ))
-        name_ = '%s-R%s-unfreeze' % (name, round_num, )
+        name = '%s-R%s-unfreeze' % (NAME, round_num, )
         try:
-            learn.load(name_)
+            learn.load(name)
         except:
             learn.unfreeze()
 
@@ -215,7 +206,7 @@ if __name__ == '__main__':
             # print('Found max_lr = %0.08f, using %0.08f' % (max_lr, max_lr_))
             # # Train
             learn.fit_one_cycle(num_epochs_, max_lr_)
-            learn.save(name_)
+            learn.save(name)
 
         # num_epochs_ *= 2
     ####
@@ -287,7 +278,7 @@ if __name__ == '__main__':
     thresholds['classifier_softmax_temp'] = best_sc
     thresholds['feature_softmax_temp'] = class_sc
     thresholds['mixing_value'] = best_p
-    # torch.save(thresholds, 'data/models/' + name + '_thresholds.pth')
+    # torch.save(thresholds, 'data/models/' + NAME + '_thresholds.pth')
 
     print ("Saving train values")
     values = {
@@ -298,7 +289,7 @@ if __name__ == '__main__':
         "classes": classes,
         "thresholds": thresholds,
     }
-    torch.save(vales, 'data/models/' + name + '-values.pth')
+    torch.save(vales, 'data/models/' + NAME + '-values.pth')
 
     print ("Saving final model")
-    learn.save(name)
+    learn.save(NAME)

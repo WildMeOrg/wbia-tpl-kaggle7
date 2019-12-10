@@ -115,7 +115,7 @@ STOPSIGNAL SIGTERM
 FROM org.wildme.ibeis.pytorch as org.wildme.ibeis.kaggle7.server
 
 # Install additional conda dependencies
-RUN conda install -y jupyter notebook \
+RUN conda install -y jupyter notebook flask_restful \
  && conda install -c conda-forge jupyter_contrib_nbextensions \
  && conda clean -ya
 
