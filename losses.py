@@ -19,6 +19,44 @@ import torch.nn.functional as F
 from torch.nn.parameter import Parameter
 import torch.nn as nn
 
+
+RING_ALPHA = 0.01
+
+
+@dataclass
+class RingLoss(Callback):
+    """`Callback` that regroups lr adjustment to seq_len, AR and TAR."""
+    learn:Learner
+    alpha:float=RING_ALPHA
+
+    def on_loss_begin(self, last_output:Tuple[list,list], **kwargs):
+        "Save the extra outputs for later and only returns the true output."
+        self.feature_out = last_output[1]
+        return {'last_output': last_output[0]}
+
+    def on_backward_begin(self,
+                          last_loss:Rank0Tensor,
+                          last_input:list,
+                          last_target:Tensor,
+                          **kwargs):
+        x_list = self.feature_out
+        ring_list = self.learn.model.module.head.rings
+        num_clf = len(ring_list)
+        loss = None
+        for cc in range(num_clf):
+            x = x_list[cc]
+            R = ring_list[cc]
+            x_norm = x.pow(2).sum(dim=1).pow(0.5)
+            diff = torch.mean(torch.abs(x_norm - R.expand_as(x_norm))**2)
+            if loss is None:
+                loss = diff.mean()
+            else:
+                loss = loss + diff.mean()
+        loss = (self.alpha * loss).sum()
+        last_loss += loss
+        return {'last_loss': last_loss}
+
+
 # @dataclass
 # class CenterLoss(Callback):
 #     "`Callback` that regroups lr adjustment to seq_len, AR and TAR."

@@ -45,7 +45,7 @@ def _ibeis_plugin_kaggle7_check_container(url):
         flag = False
         required_methods = set(endpoints[endpoint])
         supported_methods = None
-        url_ = 'http://%s/%s' % (url, endpoint, )
+        url_ = '%s/%s' % (url, endpoint, )
 
         try:
             response = requests.options(url_, timeout=1)
@@ -300,9 +300,9 @@ def ibeis_plugin_kaggle7_identification_depc(depc, kchip_rowid_list, config):
         >>> image = images[0]
         >>> assert ut.hash_data(image) in ['imlkoiskkykpbwozghmpidlqwbmglzhw']
     """
-    ut.embed()
+    ibs = depc.controller
 
-    kchip_filepath_list = ibs.depc_annot.get('KaggleSevenChip', kchip_rowid_list, 'image', read_extern=False, ensure=True)
+    kchip_filepath_list = depc.get_native('KaggleSevenChip', kchip_rowid_list, 'image', read_extern=False)
 
     model_tag = config['model_tag']
     config_ = {

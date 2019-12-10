@@ -118,6 +118,50 @@ def find_mixing_proportions(sm_preds, sim, targs):
     return out_preds, best_p, best_score
 
 
+def write_augmentations(df, tfms):
+    if not os.path.exists('data/augmentations'):
+        os.mkdir('data/augmentations')
+
+    print('Exporting Augmentations:')
+    grid = (3, 12)
+    for index in range(len(df.Image)):
+        if index > 10:
+            break
+        filename = df.Image[index]
+        basename, ext = os.path.splitext(filename)
+        path = os.path.join('data/crop_train', filename)
+        # image = open_image_grey(path)
+        image = open_image(path)
+        print('\t', path, image)
+
+        image.save('data/augmentations/%s_original%s' % (basename, ext, ))
+        for version in range(5):
+            image_ = image.apply_tfms(tfms[0], size=(SZH, SZW), resize_method=ResizeMethod.SQUISH, padding_mode='zeros')
+            c, h, w = image_.shape
+
+            h_ = h // grid[0]
+            w_ = w // grid[1]
+
+            for grid_h in range(1, grid[0], 1):
+                color = (0.0, 0.0, 1.0)
+                for offset in [-1, 0, 1]:
+                    image_.data[0, (grid_h * h_) + offset, :] = color[0]
+                    image_.data[1, (grid_h * h_) + offset, :] = color[1]
+                    image_.data[2, (grid_h * h_) + offset, :] = color[2]
+
+            for grid_w in range(1, grid[1], 1):
+                if grid_w % (grid[1] // RING_HEADS) == 0:
+                    color = (1.0, 0.0, 0.0)
+                else:
+                    color = (0.0, 1.0, 0.0)
+                for offset in [-1, 0, 1]:
+                    image_.data[0, :, (grid_w * w_) + offset] = color[0]
+                    image_.data[1, :, (grid_w * w_) + offset] = color[1]
+                    image_.data[2, :, (grid_w * w_) + offset] = color[2]
+
+            image_.save('data/augmentations/%s_augmented_%d%s' % (basename, version, ext, ))
+
+
 def get_predictions(model, val_loader):
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
@@ -302,3 +346,46 @@ def map5total(preds, targs):
 
 def map12total(preds, targs):
     return mapktotal(preds, targs, k=12)
+
+
+class Accuracy(Callback):
+    """Wrap a `func` in a callback for metrics computation."""
+
+    def __init__(self, func, name, filter_set=None):
+        super().__init__()
+        # If it's a partial, use func.func
+        # name = getattr(func, 'func', func).__name__
+        self.func = func
+        self.name = name
+        self.filter_set = filter_set
+
+    def on_epoch_begin(self, **kwargs):
+        self.values = []
+        self.targets = []
+
+    def on_batch_end(self, last_output, last_target, **kwargs):
+        """Update metric computation with `last_output` and `last_target`."""
+        last_preds = last_output[-1]
+        value = self.func(last_preds, last_target)
+        self.values.append(value)
+        self.targets.append(last_target)
+
+    def on_epoch_end(self, last_metrics, **kwargs):
+        """Set the final result in `last_metrics`."""
+        values = torch.cat(self.values)
+        targets = torch.cat(self.targets)
+
+        if self.filter_set is not None:
+            values_ = values.tolist()
+            targets_ = targets.tolist()
+
+            values_filtered = []
+            for value_, target_ in zip(values_, targets_):
+                if target_ in self.filter_set:
+                    values_filtered.append(value_)
+            value_ = sum(values_filtered) / len(values_filtered)
+            value = torch.tensor(value_).to(get_device())
+        else:
+            value = values.mean()
+
+        return add_metrics(last_metrics, value)

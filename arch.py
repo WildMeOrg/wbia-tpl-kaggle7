@@ -120,9 +120,21 @@ def make_new_densenet_block(in_feat):
     return dense_blocks
 
 
+class CustomPCBNetwork(nn.Module):
+    def __init__(self, new_model, num_heads, gem_const):
+        super().__init__()
+        self.cnn =  new_model.features
+        self.head = PCBRingHead2(num_classes, 256, num_heads, 1920, gem_const)
+
+    def forward(self, x):
+        x = self.cnn(x)
+        out = self.head(x)
+        return out
+
+
 class PCBRingHead2(nn.Module):
     def __init__(self, num_classes, feat_dim, num_clf=4, in_feat=2048, r_init=1.5, gem_const=3.74):
-        super(PCBRingHead2,self).__init__()
+        super(PCBRingHead2, self).__init__()
         self.eps = 1e-10
         self.num_classes = num_classes
         self.feat_dim = feat_dim
