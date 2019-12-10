@@ -265,6 +265,7 @@ def ibeis_plugin_kaggle7_identify_aid(ibs, kchip_filepath, config={}, **kwargs):
     response = requests.post(url, json=data, timeout=120)
     assert response.status_code == 200
     response = response.json()
+    ut.embed()
     return response
 
 

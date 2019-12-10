@@ -120,13 +120,14 @@ def make_new_densenet_block(in_feat):
     return dense_blocks
 
 
-def make_new_network(num_classes, num_heads, gem_const):
+def make_new_network(num_classes, num_heads, gem_const, pretrained=True):
     print("torch.cuda.is_available:", torch.cuda.is_available())
-    network_model = CustomPCBNetwork(torchvision.models.densenet201(pretrained=True), num_classes, num_heads, gem_const)
-    if torch.cuda.device_count() > 1:
+    network_model = CustomPCBNetwork(torchvision.models.densenet201(pretrained=pretrained), num_classes, num_heads, gem_const)
+    mutliple = torch.cuda.device_count() > 1
+    if mutliple:
         print("Using", torch.cuda.device_count(), "GPUs!")
         network_model = nn.DataParallel(network_model)
-    return network_model
+    return network_model, mutliple
 
 
 class CustomPCBNetwork(nn.Module):

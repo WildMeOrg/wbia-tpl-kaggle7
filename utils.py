@@ -174,7 +174,7 @@ def get_predictions(model, val_loader):
     c= 0
     with torch.no_grad():
         for data1,label in val_loader:
-            preds_list,feats_list = model(data1)
+            preds_list, feats_list = model(data1)
             all_preds.append(preds_list[-1].cpu())
             all_preds2.append(torch.stack(preds_list[:-1],-1).cpu())
             all_gt.append(label.cpu())
@@ -189,7 +189,7 @@ def get_predictions(model, val_loader):
         acc = (pred_clc==all_gt).float().mean().detach().cpu().item()
         out = f'acc = {acc:.3f}, map5 = {mp5:.3f}'
         print(out)
-    return all_preds, all_gt,all_feats,all_preds2
+    return all_preds, all_gt,all_feats, all_preds2
 
 
 def get_predictions_non_PCB(model, val_loader):

@@ -27,7 +27,7 @@ SEED = 0
 RING_HEADS = 4
 GEM_CONST = 5.0
 
-NAME = f'DenseNet201-GeM-{GEM_CONST}-PCB{RING_HEADS}-{SZH}-{SZW}-Ring-{RING_ALPHA}_RELU'
+NAME = f'DenseNet201-GeM-{GEM_CONST}-PCB{RING_HEADS}-{SZH}-{SZW}-Ring-{RING_ALPHA}_RELU'  # NOQA
 
 if __name__ == '__main__':
     df = pd.read_csv('data/train.csv')
@@ -60,10 +60,10 @@ if __name__ == '__main__':
                 singleton_ids.add(id_)
 
     fn2label = {row[1].Image: row[1].Id for row in df.iterrows()}
-    path2fn = lambda path: re.search('[\w-]*\.jpg$', path).group(0)
+    path2fn = lambda path: re.search('[\w-]*\.jpg$', path).group(0)  # NOQA
 
     num_classes = len(set(df.Id))
-    network_model = make_new_network(num_classes, RING_HEADS, GEM_CONST)
+    network_model, mutliple = make_new_network(num_classes, RING_HEADS, GEM_CONST, pretrained=True)
 
     tfms = (
         [
@@ -236,7 +236,7 @@ if __name__ == '__main__':
     best_preds, best_acc, best_sc = find_softmax_coef(val_preds, targs, coefs)
     best_preds = best_preds.to(get_device())
 
-    ####### Now features
+    # Now features
     print ("Extracting train feats")
     train_preds, train_gt, train_feats, train_preds2 = get_predictions(learn.model, data.train_dl)
     # train_feats, train_gt = get_train_features(learn, augment=0)
@@ -274,22 +274,18 @@ if __name__ == '__main__':
     print ("Mix Val top5 acc   = ", topkacc(out_preds, targs, k=5).cpu().item())
     print ("Mix Val top12 acc  = ", topkacc(out_preds, targs, k=12).cpu().item())
 
-    thresholds = {}
-    thresholds['classifier_softmax_temp'] = best_sc
-    thresholds['feature_softmax_temp'] = class_sc
-    thresholds['mixing_value'] = best_p
-    # torch.save(thresholds, 'data/models/' + NAME + '_thresholds.pth')
-
     print ("Saving train values")
     values = {
         "train_gt": train_gt.detach().cpu(),
         "train_feats": train_feats.detach().cpu(),
-        "val_gt": targs.detach().cpu(),
-        "val_feats": val_feats.detach().cpu(),
         "classes": classes,
-        "thresholds": thresholds,
+        "thresholds": {
+            'classifier_softmax_temp' : best_sc,
+            'feature_softmax_temp'    : class_sc,
+            'mixing_value'            : best_p,
+        },
     }
-    torch.save(vales, 'data/models/' + NAME + '-values.pth')
+    torch.save(values, 'data/models/' + NAME + '-values.pth')
 
     print ("Saving final model")
-    learn.save(NAME)
+    learn.save(NAME, with_opt=False)
