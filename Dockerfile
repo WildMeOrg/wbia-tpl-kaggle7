@@ -115,12 +115,12 @@ STOPSIGNAL SIGTERM
 FROM org.wildme.ibeis.pytorch as org.wildme.ibeis.kaggle7.server
 
 # Install additional conda dependencies
-RUN conda install -y jupyter notebook flask_restful \
+RUN conda install -y jupyter notebook \
  && conda install -c conda-forge jupyter_contrib_nbextensions \
  && conda clean -ya
 
 # Install additional PyPI dependencies
-RUN pip install fastai pretrainedmodels
+RUN pip install fastai pretrainedmodels flask_restful
 
 # Pre-download pre-trained VGG-16 model with Batch Norm
 RUN python -c 'import torchvision; torchvision.models.densenet201(pretrained=True)'
