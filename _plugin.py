@@ -271,6 +271,7 @@ def ibeis_plugin_kaggle7_identify_aid(ibs, kchip_filepath, config={}, **kwargs):
 class KaggleSevenIdentificationConfig(dt.Config):  # NOQA
     _param_info_list = [
         ut.ParamInfo('model_tag', 'crc'),
+        ut.ParamInfo('k',         100),  # Return top-k results
     ]
 
 
@@ -309,8 +310,10 @@ def ibeis_plugin_kaggle7_identification_depc(depc, kchip_rowid_list, config):
     kchip_filepath_list = depc.get_native('KaggleSevenChip', kchip_rowid_list, 'image', read_extern=False)
 
     model_tag = config['model_tag']
+    topk = config['k']
     config_ = {
         'model_tag': model_tag,
+        'topk': topk,
     }
     for kchip_filepath in kchip_filepath_list:
         response = ibs.ibeis_plugin_kaggle7_identify_aid(kchip_filepath, config=config_)
@@ -443,20 +446,15 @@ def ibeis_plugin_kaggle7(depc, qaid_list, daid_list, config):
         >>> dbdir = sysres.ensure_testdb_kaggle7()
         >>> ibs = ibeis.opendb(dbdir=dbdir)
         >>> depc = ibs.depc_annot
-        >>> gid_list, aid_list = ibs._ibeis_plugin_kaggle7_init_testdb()
-        >>>  # For tests, make a (0, 0, 1, 1) bbox with the same name in the same image for matching
-        >>> annot_uuid_list = ibs.get_annot_uuids(aid_list)
-        >>> annot_name_list = ibs.get_annot_names(aid_list)
-        >>> aid_list_ = ibs.add_annots(gid_list, [(0, 0, 1, 1)] * len(gid_list), name_list=annot_name_list)
-        >>> qaid = aid_list[0]
-        >>> qannot_name = annot_name_list[0]
-        >>> qaid_list = [qaid]
-        >>> daid_list = aid_list + aid_list_
+        >>> aid_list = ibs.get_valid_aids()
+        >>> qaid_list = aid_list[0:1]
+        >>> daid_list = aid_list
         >>> root_rowids = tuple(zip(*it.product(qaid_list, daid_list)))
         >>> config = KaggleSevenConfig()
         >>> # Call function via request
         >>> request = KaggleSevenRequest.new(depc, qaid_list, daid_list)
         >>> result = request.execute()
+        >>> ut.embed()
         >>> am = result[0]
         >>> unique_nids = am.unique_nids
         >>> name_score_list = am.name_score_list
@@ -476,39 +474,37 @@ def ibeis_plugin_kaggle7(depc, qaid_list, daid_list, config):
 
     qaids = list(set(qaid_list))
     daids = list(set(daid_list))
-
-    ut.embed()
+    all_aids = list(set(qaids + daids))
 
     assert len(qaids) == 1
-    qaid = qaids[0]
-    annot_uuid = ibs.get_annot_uuids(qaid)
-    resp_json = ibs.ibeis_plugin_kaggle7_identify(annot_uuid, use_depc=True, config=config)
-    # update response_json to use flukebook names instead of kaggle7
+    response_list = ibs.depc_annot.get('KaggleSevenIdentification', qaids, 'response')
+    response = response_list[0]
 
-    dnames = ibs.get_annot_name_texts(daids)
+    if response is None:
+        response = {}
+
+    all_names = ibs.get_annot_name_texts(all_aids)
     name_counter_dict = {}
-    for daid, dname in zip(daids, dnames):
+    for daid, dname in zip(all_aids, all_names):
         if dname in [None, const.UNKNOWN]:
             continue
         if dname not in name_counter_dict:
             name_counter_dict[dname] = 0
         name_counter_dict[dname] += 1
 
-    ids = resp_json['identification']
     name_score_dict = {}
-    for rank, result in enumerate(ids):
-        name = result['flukebook_id']
-        name_score = result['probability']
+    name_list = response.keys()
+    for name in name_list:
+        name_score = response[name]
+        name_score = round(name_score, 4)
         name_counter = name_counter_dict.get(name, 0)
         if name_counter <= 0:
             if name_score > 0.01:
-                args = (name, rank, name_score, len(daids), )
-                print('Suggested match name = %r (rank %d) with score = %0.04f is not in the daids (total %d)' % args)
+                args = (name, name_score, len(daids), )
+                print('Suggested match name = %r with score = %0.04f is not in the daids (total %d)' % args)
             continue
         assert name_counter >= 1
         annot_score = name_score / name_counter
-
-        assert name not in name_score_dict, 'KaggleSeven API response had multiple scores for name = %r' % (name, )
         name_score_dict[name] = annot_score
 
     dname_list = ibs.get_annot_name_texts(daid_list)

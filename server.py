@@ -56,7 +56,9 @@ class Kaggle7(Resource):
             image = get_image_from_base64_str(image_base64_str)
 
             config = args['config']
-            model_tag = config['model_tag']
+            model_tag = config.get('model_tag', None)
+            num_returns = config.get('topk', 100)
+
             model_url = model_url_dict.get(model_tag, None)
 
             assert model_url is not None, 'Model tag %r is not recognized' % (model_tag, )
@@ -134,7 +136,7 @@ class Kaggle7(Resource):
             final_prediction = p * classifier_prediction + (1.0 - p) * features_prediction
 
             print('Collecting prediction')
-            top_k_score_list, top_k_index_list = final_prediction.topk(12, 0)
+            top_k_score_list, top_k_index_list = final_prediction.topk(num_returns, 0)
             top_k_score_list = top_k_score_list.detach().cpu().tolist()
             classes = NETWORK_VALUES['classes']
             top_k_class_list = ut.take(classes, top_k_index_list)
