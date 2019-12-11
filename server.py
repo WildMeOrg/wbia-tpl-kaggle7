@@ -78,11 +78,11 @@ class Kaggle7(Resource):
                 if mutliple:
                     pass
 
+                if torch.cuda.is_available():
+                    network_model = network_model.cuda()
+
                 # model_weights = model_weights['model']
                 network_model.load_state_dict(model_weights)
-
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
                 network_model.eval()
 
                 NETWORK_MODEL_TAG = model_tag
@@ -143,13 +143,15 @@ class Kaggle7(Resource):
             for top_k_class, top_k_score in zip(top_k_class_list, top_k_score_list):
                 response['scores'][top_k_class] = top_k_score
             response['success'] = True
-
             print('...done')
         except Exception as ex:
             message = str(ex)
             response['message'] = message
             print('!!!ERROR!!!')
             print(response)
+
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
         return response
 
