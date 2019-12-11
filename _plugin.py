@@ -449,7 +449,7 @@ def ibeis_plugin_kaggle7(depc, qaid_list, daid_list, config):
         >>> annot_name_list = ibs.get_annot_names(aid_list)
         >>> aid_list_ = ibs.add_annots(gid_list, [(0, 0, 1, 1)] * len(gid_list), name_list=annot_name_list)
         >>> qaid_list = aid_list
-        >>> daid_list = ibs.get_valid_aids()
+        >>> daid_list = list(set(ibs.get_valid_aids()) - set(aid_list_))
         >>> root_rowids = tuple(zip(*it.product(qaid_list, daid_list)))
         >>> config = KaggleSevenConfig()
         >>> # Call function via request
@@ -464,6 +464,7 @@ def ibeis_plugin_kaggle7(depc, qaid_list, daid_list, config):
         >>> name_score_dict = dict(zip(unique_name_text_list, name_score_list_))
         >>> print('Queried KaggleSeven algorithm for ground-truth ID = %s' % (annot_name_list, ))
         >>> result = ut.repr3(name_score_dict)
+        >>> print(result)
         {
             '51649bb0-0031-4866-8ed5-f543883f9cb8': '1.0000',
         }
