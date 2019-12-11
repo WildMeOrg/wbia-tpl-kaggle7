@@ -449,7 +449,7 @@ def ibeis_plugin_kaggle7(depc, qaid_list, daid_list, config):
         >>> annot_name_list = ibs.get_annot_names(aid_list)
         >>> aid_list_ = ibs.add_annots(gid_list, [(0, 0, 1, 1)] * len(gid_list), name_list=annot_name_list)
         >>> qaid_list = aid_list
-        >>> daid_list = list(set(ibs.get_valid_aids()) - set(aid_list_))
+        >>> daid_list = ibs.get_valid_aids()
         >>> root_rowids = tuple(zip(*it.product(qaid_list, daid_list)))
         >>> config = KaggleSevenConfig()
         >>> # Call function via request
