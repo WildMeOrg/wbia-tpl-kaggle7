@@ -78,8 +78,8 @@ class Kaggle7(Resource):
                 if mutliple:
                     pass
 
-                model = model_weights['model']
-                network_model.load_state_dict(model)
+                # model_weights = model_weights['model']
+                network_model.load_state_dict(model_weights)
 
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
