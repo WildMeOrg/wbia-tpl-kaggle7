@@ -12,6 +12,8 @@ import requests
 from PIL import Image
 from io import BytesIO
 import cv2
+import tqdm
+
 
 (print, rrr, profile) = ut.inject2(__name__)
 
@@ -258,7 +260,7 @@ def ibeis_plugin_kaggle7_identify_aid(ibs, kchip_filepath, config={}, **kwargs):
         'config': config
     }
     url_ = 'http://%s/api/classify' % (url)
-    print('Sending identify to %s' % url)
+    # print('Sending identify to %s' % url)
     response = requests.post(url_, json=data, timeout=120)
     assert response.status_code == 200
     response = response.json()
@@ -313,7 +315,7 @@ def ibeis_plugin_kaggle7_identification_depc(depc, kchip_rowid_list, config):
         'model_tag': model_tag,
         'topk': topk,
     }
-    for kchip_filepath in kchip_filepath_list:
+    for kchip_filepath in tqdm.tqdm(kchip_filepath_list):
         response = ibs.ibeis_plugin_kaggle7_identify_aid(kchip_filepath, config=config_)
         yield (response, )
 
