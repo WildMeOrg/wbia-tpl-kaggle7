@@ -122,8 +122,8 @@ RUN conda install -y jupyter notebook \
 # Install additional PyPI dependencies
 RUN pip install fastai pretrainedmodels flask_restful utool
 
-# Pre-download pre-trained VGG-16 model with Batch Norm
-RUN python -c 'import torchvision; torchvision.models.densenet201(pretrained=True)'
+# # Pre-download pre-trained VGG-16 model with Batch Norm
+# RUN python -c 'import torchvision; torchvision.models.densenet201(pretrained=True)'
 
 # Copy local Python code from repo into container
 COPY ./*.py /opt/whale/

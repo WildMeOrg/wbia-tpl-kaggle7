@@ -438,7 +438,7 @@ def ibeis_plugin_kaggle7(depc, qaid_list, daid_list, config):
         >>> import utool as ut
         >>> from ibeis.init import sysres
         >>> import numpy as np
-        >>> dbdir = sysres.ensure_testdb_identification_example()
+        >>> dbdir = sysres.ensure_testdb_kaggle7()
         >>> ibs = ibeis.opendb(dbdir=dbdir)
         >>> depc = ibs.depc_annot
         >>> gid_list, aid_list = ibs._ibeis_plugin_kaggle7_init_testdb()
@@ -474,6 +474,8 @@ def ibeis_plugin_kaggle7(depc, qaid_list, daid_list, config):
 
     qaids = list(set(qaid_list))
     daids = list(set(daid_list))
+
+    ut.embed()
 
     assert len(qaids) == 1
     qaid = qaids[0]
