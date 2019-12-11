@@ -218,6 +218,7 @@ def get_predictions_non_PCB(model, val_loader):
         out = f'acc = {acc:.3f}, map5 = {mp5:.3f}'
         print(out)
     return all_preds, all_gt,all_feats,all_preds2
+
 def distance_matrix_vector(anchor, positive, d2_sq):
     """Given batch of anchor descriptors and positive descriptors calculate distance matrix"""
     d1_sq = torch.sum(anchor * anchor, dim=1).unsqueeze(-1)
