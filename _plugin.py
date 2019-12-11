@@ -292,14 +292,17 @@ def ibeis_plugin_kaggle7_identification_depc(depc, kchip_rowid_list, config):
         >>> # ENABLE_DOCTEST
         >>> from ibeis_kaggle7._plugin import *  # NOQA
         >>> import ibeis
+        >>> import numpy as np
         >>> from ibeis.init import sysres
         >>> dbdir = sysres.ensure_testdb_kaggle7()
         >>> ibs = ibeis.opendb(dbdir=dbdir)
         >>> aid_list = ibs.get_image_aids(1)
-        >>> response = ibs.depc_annot.get('KaggleSevenIdentification', aid_list, 'response')
-        >>> import utool as ut
-        >>> ut.embed()
-        >>> assert ut.hash_data(image) in ['imlkoiskkykpbwozghmpidlqwbmglzhw']
+        >>> response_list = ibs.depc_annot.get('KaggleSevenIdentification', aid_list, 'response')
+        >>> response = response_list[0]
+        >>> name_text_list = ibs.get_annot_names(aid_list)
+        >>> name_text = name_text_list[0]
+        >>> score = response.get(name_text, -1)
+        >>> assert np.isclose(score, 1.0)
     """
     ibs = depc.controller
 
