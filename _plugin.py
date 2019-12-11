@@ -298,7 +298,8 @@ def ibeis_plugin_kaggle7_identification_depc(depc, kchip_rowid_list, config):
         >>> ibs = ibeis.opendb(dbdir=dbdir)
         >>> aid_list = ibs.get_image_aids(1)
         >>> response = ibs.depc_annot.get('KaggleSevenIdentification', aid_list, 'response')
-        >>> image = images[0]
+        >>> import utool as ut
+        >>> ut.embed()
         >>> assert ut.hash_data(image) in ['imlkoiskkykpbwozghmpidlqwbmglzhw']
     """
     ibs = depc.controller
