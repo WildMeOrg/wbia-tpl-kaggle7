@@ -45,7 +45,7 @@ def _ibeis_plugin_kaggle7_check_container(url):
         flag = False
         required_methods = set(endpoints[endpoint])
         supported_methods = None
-        url_ = '%s/%s' % (url, endpoint, )
+        url_ = 'http://%s/%s' % (url, endpoint, )
 
         try:
             response = requests.options(url_, timeout=1)
@@ -253,19 +253,18 @@ def get_b64_image_str(ibs, image_filepath, **kwargs):
 
 @register_ibs_method
 def ibeis_plugin_kaggle7_identify_aid(ibs, kchip_filepath, config={}, **kwargs):
-    ut.embed()
     url = ibs.ibeis_plugin_kaggle7_ensure_backend(**kwargs)
     image_base64_str = get_b64_image_str(ibs, kchip_filepath, **config)
     data = {
         'image': image_base64_str,
         'config': config
     }
-    url = 'http://%s/api/classify' % (url)
+    url_ = 'http://%s/api/classify' % (url)
     print('Sending identify to %s' % url)
-    response = requests.post(url, json=data, timeout=120)
+    response = requests.post(url_, json=data, timeout=120)
     assert response.status_code == 200
     response = response.json()
-    ut.embed()
+    response = response.get('scores', None)
     return response
 
 
@@ -513,11 +512,6 @@ def ibeis_plugin_kaggle7(depc, qaid_list, daid_list, config):
     for qaid, daid, dname in zip(qaid_list, daid_list, dname_list):
         value = name_score_dict.get(dname, 0)
         yield (value, )
-
-
-# @register_ibs_method
-# def kaggle7_embed(ibs):
-#     ut.embed()
 
 
 if __name__ == '__main__':
