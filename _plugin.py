@@ -1,9 +1,7 @@
 from __future__ import absolute_import, division, print_function
-from os.path import abspath, exists, join, dirname, split, splitext
 import ibeis
 from ibeis.control import controller_inject, docker_control
 from ibeis.constants import ANNOTATION_TABLE
-from ibeis.web.apis_engine import ensure_uuid_list
 import ibeis.constants as const
 import utool as ut
 import dtool as dt
@@ -11,7 +9,7 @@ import vtool as vt
 import numpy as np
 import base64
 import requests
-from PIL import Image, ImageDraw
+from PIL import Image
 from io import BytesIO
 import cv2
 
@@ -446,35 +444,34 @@ def ibeis_plugin_kaggle7(depc, qaid_list, daid_list, config):
         >>> dbdir = sysres.ensure_testdb_kaggle7()
         >>> ibs = ibeis.opendb(dbdir=dbdir)
         >>> depc = ibs.depc_annot
-        >>> aid_list = ibs.get_valid_aids()
-        >>> qaid_list = aid_list[0:1]
-        >>> daid_list = aid_list
+        >>> gid_list = ibs.get_valid_gids()[:1]
+        >>> aid_list = ut.flatten(ibs.get_image_aids(gid_list))
+        >>> annot_name_list = ibs.get_annot_names(aid_list)
+        >>> aid_list_ = ibs.add_annots(gid_list, [(0, 0, 1, 1)] * len(gid_list), name_list=annot_name_list)
+        >>> qaid_list = aid_list
+        >>> daid_list = ibs.get_valid_aids()
         >>> root_rowids = tuple(zip(*it.product(qaid_list, daid_list)))
         >>> config = KaggleSevenConfig()
         >>> # Call function via request
         >>> request = KaggleSevenRequest.new(depc, qaid_list, daid_list)
         >>> result = request.execute()
-        >>> ut.embed()
+        >>> ibs.delete_annots(aid_list_)
         >>> am = result[0]
         >>> unique_nids = am.unique_nids
         >>> name_score_list = am.name_score_list
         >>> unique_name_text_list = ibs.get_name_texts(unique_nids)
-        >>> name_score_list_ = ['%0.04f' % (score, ) for score in am.name_score_list]
+        >>> name_score_list_ = ['%0.04f' % (score, ) for score in am.name_score_list if score >= 0.0001]
         >>> name_score_dict = dict(zip(unique_name_text_list, name_score_list_))
-        >>> print('Queried KaggleSeven algorithm for ground-truth ID = %s' % (qannot_name, ))
+        >>> print('Queried KaggleSeven algorithm for ground-truth ID = %s' % (annot_name_list, ))
         >>> result = ut.repr3(name_score_dict)
         {
-            '64edec9a-b998-4f96-a9d6-6dddcb8f8c0a': '0.8082',
-            '825c5de0-d764-464c-91b6-9e507c5502fd': '0.0000',
-            'bf017955-9ed9-4311-96c9-eed4556cdfdf': '0.0000',
-            'e36c9f90-6065-4354-822d-c0fef25441ad': '0.0001',
+            '51649bb0-0031-4866-8ed5-f543883f9cb8': '1.0000',
         }
     """
     ibs = depc.controller
 
     qaids = list(set(qaid_list))
     daids = list(set(daid_list))
-    all_aids = list(set(qaids + daids))
 
     assert len(qaids) == 1
     response_list = ibs.depc_annot.get('KaggleSevenIdentification', qaids, 'response')
@@ -483,9 +480,9 @@ def ibeis_plugin_kaggle7(depc, qaid_list, daid_list, config):
     if response is None:
         response = {}
 
-    all_names = ibs.get_annot_name_texts(all_aids)
+    names = ibs.get_annot_name_texts(daids)
     name_counter_dict = {}
-    for daid, dname in zip(all_aids, all_names):
+    for daid, dname in zip(daids, names):
         if dname in [None, const.UNKNOWN]:
             continue
         if dname not in name_counter_dict:
