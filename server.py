@@ -1,7 +1,5 @@
 from flask import Flask
 from flask_restful import Api, Resource, reqparse
-from arch import make_new_network, L2Norm
-from train_VGG16 import RING_HEADS, GEM_CONST, SZH, SZW
 from io import BytesIO
 from PIL import Image
 import utool as ut
@@ -11,6 +9,8 @@ import torch
 from torchvision import transforms
 from fastai.vision import pil2tensor, imagenet_stats
 from utils import batched_dmv, dm2cm
+from arch import make_new_network, L2Norm, get_device
+from train_VGG16 import RING_HEADS, GEM_CONST, SZH, SZW
 
 
 APP = Flask(__name__)
@@ -98,6 +98,7 @@ class Kaggle7(Resource):
 
             size = input_image.size()
             input_tensor = input_image.view(-1, size[0], size[1], size[2])
+            input_tensor = input_tensor.to(get_device())
 
             # Run inference
             print('Running inference on input tensor %r' % (input_tensor.size(), ))
