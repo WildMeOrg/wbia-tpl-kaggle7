@@ -12,12 +12,12 @@ import cv2
 
 
 MIN_AIDS = 1
-MAX_AIDS = np.inf
+MAX_AIDS = 20
 MAX_NAMES = np.inf
 PADDING = 32
 
 
-url = 'https://kaiju.dyn.wildme.io/public/random/humpback.crc.csv'
+url = 'https://cthulhu.dyn.wildme.io/public/random/humpback.all.csv'
 local_filepath = ut.download_url(url)
 filepath = abspath(local_filepath)
 
@@ -53,7 +53,18 @@ print('FB Num unique gids: %d' % (len(set(gid_list)), ))
 print('FB Num unique nids: %d' % (len(set(nid_list)), ))
 print('FB Num unknown acmids: %d' % (gid_list.count(None), ))
 print('FB Num unknown names: %d' % (len(unknown_name_list), ))
+
+flag_list = [gid is not None for gid in gid_list]
+gid_list                  = ut.compress(gid_list, flag_list)
+flukebook_image_uuid_list = ut.compress(flukebook_image_uuid_list, flag_list)
+flukebook_name_text_list  = ut.compress(flukebook_name_text_list, flag_list)
 assert None not in gid_list
+
+print('DE-NONE-ING')
+print('FB Num records: %d' % (len(flukebook_name_text_list), ))
+print('FB Num unique acmids: %d' % (len(set(flukebook_image_acmid_list)), ))
+print('FB Num unique names: %d' % (len(set(flukebook_name_text_list)), ))
+
 
 # FIND DETECTIONS
 depc = ibs.depc_annot
@@ -68,13 +79,23 @@ for gid, result_list, flukebook_name_text in zip(gid_list, results_list, flukebo
     status, bbox_list, theta_list, conf_list, species_list = result_list
     zipped = sorted(list(zip(conf_list, bbox_list, theta_list, species_list)), reverse=True)
     for conf, bbox, theta, species in zipped:
-        if conf >= 0.80 and species == 'whale_fluke':
+        if conf >= 0.90 and species == 'whale_fluke':
             global_gid_list.append(gid)
             global_bbox_list.append(bbox)
             global_name_list.append(flukebook_name_text)
             break
 
 global_aid_list = ibs.add_annots(global_gid_list, global_bbox_list)
+
+seen_aid_set = set([])
+flag_list = []
+for global_aid in global_aid_list:
+    flag = global_aid not in seen_aid_set
+    flag_list.append(flag)
+    seen_aid_set.add(global_aid)
+
+global_aid_list  = ut.compress(global_aid_list, flag_list)
+global_name_list = ut.compress(global_name_list, flag_list)
 ibs.set_annot_names(global_aid_list, global_name_list)
 
 global_name_dict = {}

@@ -84,7 +84,7 @@ if __name__ == '__main__':
         ],
     )
 
-    write_augmentations(df, tfms)
+    write_augmentations(df, tfms, SZH, SZW, RING_HEADS)
 
     data = (
         ImageListGray
