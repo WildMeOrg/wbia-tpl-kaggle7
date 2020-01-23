@@ -17,7 +17,7 @@ MAX_NAMES = np.inf
 PADDING = 32
 
 
-url = 'https://cthulhu.dyn.wildme.io/public/random/humpback.all.csv'
+url = 'https://wildbookiarepository.blob.core.windows.net/random/humpback.all.csv'
 local_filepath = ut.download_url(url)
 filepath = abspath(local_filepath)
 

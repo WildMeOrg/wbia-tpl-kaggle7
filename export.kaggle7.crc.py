@@ -17,7 +17,7 @@ MAX_NAMES = np.inf
 PADDING = 32
 
 
-url = 'https://kaiju.dyn.wildme.io/public/random/humpback.crc.csv'
+url = 'https://wildbookiarepository.blob.core.windows.net/random/humpback.crc.csv'
 local_filepath = ut.download_url(url)
 filepath = abspath(local_filepath)
 

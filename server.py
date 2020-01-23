@@ -21,7 +21,7 @@ NETWORK           = None
 NETWORK_VALUES    = None
 
 model_url_dict = {
-    'crc': 'https://cthulhu.dyn.wildme.io/public/models/kaggle7.crc.final.1.pth',
+    'crc': 'https://wildbookiarepository.blob.core.windows.net/models/kaggle7.crc.final.1.pth',
 }
 
 CMODE = 'RGB'
