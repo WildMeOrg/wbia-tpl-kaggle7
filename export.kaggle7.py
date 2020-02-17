@@ -17,7 +17,7 @@ MAX_NAMES = np.inf
 PADDING = 32
 
 
-url = 'https://wildbookiarepository.blob.core.windows.net/random/humpback.all.csv'
+url = 'https://wildbookiarepository.azureedge.net/random/humpback.all.csv'
 local_filepath = ut.download_url(url)
 filepath = abspath(local_filepath)
 
