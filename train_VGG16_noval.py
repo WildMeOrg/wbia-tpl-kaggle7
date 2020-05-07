@@ -69,7 +69,7 @@ if LOAD_IF_CAN:
     try:
         learn.load(loadname)
         LOADED = True
-    except:
+    except Exception:
         LOADED = False
 if not LOADED:
     learn.fit_one_cycle(100, 1e-2/1.5)#6.7e-3
@@ -85,7 +85,7 @@ if LOAD_IF_CAN:
     try:
         learn.load(name+ '_unfreeze')
         LOADED = True
-    except:
+    except Exception:
         LOADED = False
 
 if not LOADED:
@@ -133,7 +133,7 @@ thlist = thresholds['mix_list']
 pit1 = thlist[0]*cm3 + thlist[1]*preds_ft_0t+thlist[2]*preds_t
 try:
     os.makedirs('subs')
-except:
+except Exception:
     pass
 create_submission(pit1.cpu(), learn.data, name, classes)
 print ('new_whales at 1st pos:', pd.read_csv(f'subs/{name}.csv.gz').Id.str.split().apply(lambda x: x[0] == 'new_whale').mean())

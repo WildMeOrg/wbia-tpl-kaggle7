@@ -86,14 +86,14 @@ def get_train_features(learn, augment=3):
         torch.cuda.empty_cache()
     try:
         all_preds0, all_gt0, all_feats0, all_preds20 = get_predictions(learn.model,learn.data.train_dl)
-    except:
+    except Exception:
         all_preds0, all_gt0, all_feats0, all_preds20 = get_predictions_non_PCB(learn.model,learn.data.train_dl)
     for i in range(max(augment, 0)):
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
         try:
             all_preds00, all_gt00, all_feats00, all_preds200 = get_predictions(learn.model,learn.data.train_dl)
-        except:
+        except Exception:
             all_preds00, all_gt00, all_feats00, all_preds200 =  get_predictions_non_PCB(learn.model,learn.data.train_dl)
         all_gt0 = torch.cat([all_gt0, all_gt00], dim=0)
         all_feats0 = torch.cat([all_feats0, all_feats00], dim=0)
@@ -296,7 +296,7 @@ def batched_dmv(d1,d2):
     d2_sq1 = torch.sum(d2**2, dim=1).unsqueeze(-1)
     try:
         out = distance_matrix_vector(d1.to(get_device()),d2.to(get_device()),d2_sq1.to(get_device())).cpu()
-    except:
+    except Exception:
         out = distance_matrix_vector(d1,d2,d2_sq1).cpu()
     return out
 

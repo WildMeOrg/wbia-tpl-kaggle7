@@ -175,7 +175,7 @@ if __name__ == '__main__':
         name = '%s-R%s-freeze' % (NAME, round_num, )
         try:
             learn.load(name)
-        except:
+        except Exception:
             learn.freeze()
 
             # # Find lr
@@ -194,7 +194,7 @@ if __name__ == '__main__':
         name = '%s-R%s-unfreeze' % (NAME, round_num, )
         try:
             learn.load(name)
-        except:
+        except Exception:
             learn.unfreeze()
 
             # # Find lr
