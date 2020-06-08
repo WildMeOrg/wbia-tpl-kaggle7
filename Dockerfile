@@ -1,7 +1,7 @@
 ##########################################################################################
 # STAGE 1 - Image for Wild Me's version of PyTorch
 ##########################################################################################
-FROM nvidia/cuda:10.1-cudnn7-devel-ubuntu18.04 as org.wildme.ibeis.pytorch
+FROM nvidia/cuda:10.1-cudnn7-devel-ubuntu18.04 as org.wildme.wbia.pytorch
 
 MAINTAINER Wild Me <dev@wildme.org> 
 
@@ -72,7 +72,7 @@ RUN chmod -R a+w .
 ##########################################################################################
 # STAGE 2 - Image for whale-identification-2018
 ##########################################################################################
-FROM org.wildme.ibeis.pytorch as org.wildme.ibeis.kaggle7.train
+FROM org.wildme.wbia.pytorch as org.wildme.wbia.kaggle7.train
 
 # Install additional conda dependencies
 RUN conda install -y jupyter notebook \
@@ -112,7 +112,7 @@ STOPSIGNAL SIGTERM
 ##########################################################################################
 # STAGE 2 - Image for whale-identification-2018
 ##########################################################################################
-FROM org.wildme.ibeis.pytorch as org.wildme.ibeis.kaggle7.server
+FROM org.wildme.wbia.pytorch as org.wildme.wbia.kaggle7.server
 
 # Install additional conda dependencies
 RUN conda install -y jupyter notebook \

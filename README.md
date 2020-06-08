@@ -69,10 +69,10 @@ cp -R flukebook.id.fluke.crc.all/valid/manifest/*.jpg data/train/
 cp -R flukebook.id.fluke.crc.all/train.txt data/train.crc.txt
 cp -R flukebook.id.fluke.crc.all/valid.txt data/valid.crc.txt
 
-cp -R data_kaggle2/ibeis/export-encounters/train/manifest/*.jpg data/train/
-cp -R data_kaggle2/ibeis/export-encounters/valid/manifest/*.jpg data/train/
-cp -R data_kaggle2/ibeis/export-encounters/train.txt data/train.kaggle.txt
-cp -R data_kaggle2/ibeis/export-encounters/valid.txt data/valid.kaggle.txt
+cp -R data_kaggle2/wbia/export-encounters/train/manifest/*.jpg data/train/
+cp -R data_kaggle2/wbia/export-encounters/valid/manifest/*.jpg data/train/
+cp -R data_kaggle2/wbia/export-encounters/train.txt data/train.kaggle.txt
+cp -R data_kaggle2/wbia/export-encounters/valid.txt data/valid.kaggle.txt
 
 cp -R data_kaggle2/test/*.jpg data/test/
 cp -R data_kaggle2/test.csv data/test.csv

@@ -1,9 +1,9 @@
 from os.path import join, splitext
-import ibeis
+import wbia
 import uuid
 
-ibs = ibeis.opendb(dbdir='/data/ibeis/testdb_kaggle7/')
-ibs_src = ibeis.opendb(dbdir='/data/ibeis/Flukebook_Master/')
+ibs = wbia.opendb(dbdir='/data/wbia/testdb_kaggle7/')
+ibs_src = wbia.opendb(dbdir='/data/wbia/Flukebook_Master/')
 
 data_filepath = '/home/jason.parham/'
 with open(join(data_filepath, 'valid.txt')) as valid_file:
