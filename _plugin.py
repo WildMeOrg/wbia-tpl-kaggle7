@@ -1,8 +1,8 @@
 from __future__ import absolute_import, division, print_function
-import ibeis
-from ibeis.control import controller_inject, docker_control
-from ibeis.constants import ANNOTATION_TABLE
-import ibeis.constants as const
+import wbia
+from wbia.control import controller_inject, docker_control
+from wbia.constants import ANNOTATION_TABLE
+import wbia.constants as const
 import utool as ut
 import dtool as dt
 import vtool as vt
@@ -18,8 +18,8 @@ import tqdm
 (print, rrr, profile) = ut.inject2(__name__)
 
 _, register_ibs_method = controller_inject.make_ibs_register_decorator(__name__)
-register_api = controller_inject.get_ibeis_flask_api(__name__)
-register_route = controller_inject.get_ibeis_flask_route(__name__)
+register_api = controller_inject.get_wbia_flask_api(__name__)
+register_route = controller_inject.get_wbia_flask_route(__name__)
 register_preproc_annot = controller_inject.register_preprocs['annot']
 
 
@@ -27,14 +27,14 @@ u"""
 Interfacing with the ACR from python is a headache, so for now we will assume that
 the docker image has already been downloaded. Command:
 
-docker pull wildme.azurecr.io/ibeis/kaggle7:latest
+docker pull wildme.azurecr.io/wbia/kaggle7:latest
 """
 
 
 BACKEND_URL = None
 
 
-def _ibeis_plugin_kaggle7_check_container(url):
+def _wbia_plugin_kaggle7_check_container(url):
     endpoints = {
         'api/classify'  : ['POST'],
     }
@@ -61,7 +61,7 @@ def _ibeis_plugin_kaggle7_check_container(url):
                 flag = True
         if not flag:
             args = (endpoint, )
-            print('[ibeis_kaggle7 - FAILED CONTAINER ENSURE CHECK] Endpoint %r failed the check' % args)
+            print('[wbia_kaggle7 - FAILED CONTAINER ENSURE CHECK] Endpoint %r failed the check' % args)
             print('\tRequired Methods:  %r' % (required_methods, ))
             print('\tSupported Methods: %r' % (supported_methods, ))
         print('\tFlag: %r' % (flag, ))
@@ -70,11 +70,11 @@ def _ibeis_plugin_kaggle7_check_container(url):
     return supported
 
 
-docker_control.docker_register_config(None, 'flukebook_kaggle7', 'wildme.azurecr.io/ibeis/kaggle7:latest', run_args={'_internal_port': 5000, '_external_suggested_port': 5000}, container_check_func=_ibeis_plugin_kaggle7_check_container)
+docker_control.docker_register_config(None, 'flukebook_kaggle7', 'wildme.azurecr.io/wbia/kaggle7:latest', run_args={'_internal_port': 5000, '_external_suggested_port': 5000}, container_check_func=_wbia_plugin_kaggle7_check_container)
 
 
 @register_ibs_method
-def ibeis_plugin_kaggle7_ensure_backend(ibs, container_name='flukebook_kaggle7', **kwargs):
+def wbia_plugin_kaggle7_ensure_backend(ibs, container_name='flukebook_kaggle7', **kwargs):
     global BACKEND_URL
     # make sure that the container is online using docker_control functions
     if BACKEND_URL is None:
@@ -109,21 +109,21 @@ class KaggleSevenChipConfig(dt.Config):  # NOQA
     configclass=KaggleSevenChipConfig,
     fname='kaggle7',
     chunksize=128)
-def ibeis_plugin_kaggle7_chip_depc(depc, aid_list, config):
+def wbia_plugin_kaggle7_chip_depc(depc, aid_list, config):
     r"""
     Refine localizations for CurvRank with Dependency Cache (depc)
 
     CommandLine:
-        python -m ibeis_kaggle7._plugin --test-ibeis_plugin_kaggle7_chip_depc
-        python -m ibeis_kaggle7._plugin --test-ibeis_plugin_kaggle7_chip_depc:0
+        python -m wbia_kaggle7._plugin --test-wbia_plugin_kaggle7_chip_depc
+        python -m wbia_kaggle7._plugin --test-wbia_plugin_kaggle7_chip_depc:0
 
     Example0:
         >>> # ENABLE_DOCTEST
-        >>> from ibeis_kaggle7._plugin import *  # NOQA
-        >>> import ibeis
-        >>> from ibeis.init import sysres
+        >>> from wbia_kaggle7._plugin import *  # NOQA
+        >>> import wbia
+        >>> from wbia.init import sysres
         >>> dbdir = sysres.ensure_testdb_kaggle7()
-        >>> ibs = ibeis.opendb(dbdir=dbdir)
+        >>> ibs = wbia.opendb(dbdir=dbdir)
         >>> aid_list = ibs.get_image_aids(1)
         >>> images = ibs.depc_annot.get('KaggleSevenChip', aid_list, 'image')
         >>> image = images[0]
@@ -214,7 +214,7 @@ def kaggle7_chip_src(aid=None, ibs=None, **kwargs):
     from six.moves import cStringIO as StringIO
     from PIL import Image  # NOQA
     from flask import current_app, send_file
-    from ibeis.web import appfuncs as appf
+    from wbia.web import appfuncs as appf
     import six
 
     if ibs is None:
@@ -252,8 +252,8 @@ def get_b64_image_str(ibs, image_filepath, **kwargs):
 
 
 @register_ibs_method
-def ibeis_plugin_kaggle7_identify_aid(ibs, kchip_filepath, config={}, **kwargs):
-    url = ibs.ibeis_plugin_kaggle7_ensure_backend(**kwargs)
+def wbia_plugin_kaggle7_identify_aid(ibs, kchip_filepath, config={}, **kwargs):
+    url = ibs.wbia_plugin_kaggle7_ensure_backend(**kwargs)
     image_base64_str = get_b64_image_str(ibs, kchip_filepath, **config)
     data = {
         'image': image_base64_str,
@@ -281,22 +281,22 @@ class KaggleSevenIdentificationConfig(dt.Config):  # NOQA
     configclass=KaggleSevenIdentificationConfig,
     fname='kaggle7',
     chunksize=128)
-def ibeis_plugin_kaggle7_identification_depc(depc, kchip_rowid_list, config):
+def wbia_plugin_kaggle7_identification_depc(depc, kchip_rowid_list, config):
     r"""
     Refine localizations for CurvRank with Dependency Cache (depc)
 
     CommandLine:
-        python -m ibeis_kaggle7._plugin --test-ibeis_plugin_kaggle7_identification_depc
-        python -m ibeis_kaggle7._plugin --test-ibeis_plugin_kaggle7_identification_depc:0
+        python -m wbia_kaggle7._plugin --test-wbia_plugin_kaggle7_identification_depc
+        python -m wbia_kaggle7._plugin --test-wbia_plugin_kaggle7_identification_depc:0
 
     Example0:
         >>> # ENABLE_DOCTEST
-        >>> from ibeis_kaggle7._plugin import *  # NOQA
-        >>> import ibeis
+        >>> from wbia_kaggle7._plugin import *  # NOQA
+        >>> import wbia
         >>> import numpy as np
-        >>> from ibeis.init import sysres
+        >>> from wbia.init import sysres
         >>> dbdir = sysres.ensure_testdb_kaggle7()
-        >>> ibs = ibeis.opendb(dbdir=dbdir)
+        >>> ibs = wbia.opendb(dbdir=dbdir)
         >>> aid_list = ibs.get_image_aids(1)
         >>> response_list = ibs.depc_annot.get('KaggleSevenIdentification', aid_list, 'response')
         >>> response = response_list[0]
@@ -316,7 +316,7 @@ def ibeis_plugin_kaggle7_identification_depc(depc, kchip_rowid_list, config):
         'topk': topk,
     }
     for kchip_filepath in tqdm.tqdm(kchip_filepath_list):
-        response = ibs.ibeis_plugin_kaggle7_identify_aid(kchip_filepath, config=config_)
+        response = ibs.wbia_plugin_kaggle7_identify_aid(kchip_filepath, config=config_)
         yield (response, )
 
 
@@ -350,7 +350,7 @@ def get_match_results(depc, qaid_list, daid_list, score_list, config):
         annot_scores = annot_scores.compress(is_valid)
 
         # Hacked in version of creating an annot match object
-        match_result = ibeis.AnnotMatch()
+        match_result = wbia.AnnotMatch()
         match_result.qaid = qaid
         match_result.qnid = qnid
         match_result.daid_list = daid_list_
@@ -367,11 +367,11 @@ def get_match_results(depc, qaid_list, daid_list, score_list, config):
 class KaggleSevenConfig(dt.Config):  # NOQA
     """
     CommandLine:
-        python -m ibeis_kaggle7._plugin --test-KaggleSevenConfig
+        python -m wbia_kaggle7._plugin --test-KaggleSevenConfig
 
     Example:
         >>> # ENABLE_DOCTEST
-        >>> from ibeis_kaggle7._plugin import *  # NOQA
+        >>> from wbia_kaggle7._plugin import *  # NOQA
         >>> config = KaggleSevenConfig()
         >>> result = config.get_cfgstr()
         >>> print(result)
@@ -429,22 +429,22 @@ class KaggleSevenRequest(dt.base.VsOneSimilarityRequest):
     fname='kaggle7',
     rm_extern_on_delete=True,
     chunksize=None)
-def ibeis_plugin_kaggle7(depc, qaid_list, daid_list, config):
+def wbia_plugin_kaggle7(depc, qaid_list, daid_list, config):
     r"""
     CommandLine:
-        python -m ibeis_kaggle7._plugin --exec-ibeis_plugin_kaggle7
-        python -m ibeis_kaggle7._plugin --exec-ibeis_plugin_kaggle7:0
+        python -m wbia_kaggle7._plugin --exec-wbia_plugin_kaggle7
+        python -m wbia_kaggle7._plugin --exec-wbia_plugin_kaggle7:0
 
     Example0:
         >>> # DISABLE_DOCTEST
-        >>> from ibeis_kaggle7._plugin import *
-        >>> import ibeis
+        >>> from wbia_kaggle7._plugin import *
+        >>> import wbia
         >>> import itertools as it
         >>> import utool as ut
-        >>> from ibeis.init import sysres
+        >>> from wbia.init import sysres
         >>> import numpy as np
         >>> dbdir = sysres.ensure_testdb_kaggle7()
-        >>> ibs = ibeis.opendb(dbdir=dbdir)
+        >>> ibs = wbia.opendb(dbdir=dbdir)
         >>> depc = ibs.depc_annot
         >>> gid_list = ibs.get_valid_gids()[:1]
         >>> aid_list = ut.flatten(ibs.get_image_aids(gid_list))
@@ -516,7 +516,7 @@ def ibeis_plugin_kaggle7(depc, qaid_list, daid_list, config):
 if __name__ == '__main__':
     r"""
     CommandLine:
-        python -m ibeis_kaggle7._plugin --allexamples
+        python -m wbia_kaggle7._plugin --allexamples
     """
     import multiprocessing
     multiprocessing.freeze_support()  # for win32
