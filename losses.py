@@ -30,7 +30,7 @@ class RingLoss(Callback):
     alpha:float=RING_ALPHA
 
     def on_loss_begin(self, last_output:Tuple[list,list], **kwargs):
-        "Save the extra outputs for later and only returns the true output."
+        'Save the extra outputs for later and only returns the true output.'
         self.feature_out = last_output[1]
         return {'last_output': last_output[0]}
 

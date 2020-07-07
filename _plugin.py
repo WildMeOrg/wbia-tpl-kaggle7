@@ -246,8 +246,8 @@ def kaggle7_chip_src(aid=None, ibs=None, **kwargs):
 def get_b64_image_str(ibs, image_filepath, **kwargs):
     image = Image.open(image_filepath)
     byte_buffer = BytesIO()
-    image.save(byte_buffer, format="JPEG")
-    image_base64_str = base64.b64encode(byte_buffer.getvalue()).decode("utf-8")
+    image.save(byte_buffer, format='JPEG')
+    image_base64_str = base64.b64encode(byte_buffer.getvalue()).decode('utf-8')
     return image_base64_str
 
 
