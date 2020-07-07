@@ -171,7 +171,7 @@ if __name__ == '__main__':
     ]
 
     for round_num, (max_lr_, num_epochs_) in enumerate(max_lr_epochs_list):
-        print ("Round %d training (freeze)" % (round_num + 1, ))
+        print ('Round %d training (freeze)' % (round_num + 1, ))
         name = '%s-R%s-freeze' % (NAME, round_num, )
         try:
             learn.load(name)
@@ -190,7 +190,7 @@ if __name__ == '__main__':
             learn.fit_one_cycle(num_epochs_, max_lr_)
             learn.save(name)
 
-        print ("Round %d training (unfreeze)" % (round_num + 1, ))
+        print ('Round %d training (unfreeze)' % (round_num + 1, ))
         name = '%s-R%s-unfreeze' % (NAME, round_num, )
         try:
             learn.load(name)
@@ -225,7 +225,7 @@ if __name__ == '__main__':
     # temperature scaling
     val_preds, val_gt, val_feats, val_preds2 = get_predictions(learn.model, data.valid_dl)
     val_preds = val_preds.to(get_device())
-    print ("Finding softmax coef")
+    print ('Finding softmax coef')
     targs = torch.tensor([classes.index(label.obj) if label else num_classes for label in learn.data.valid_ds.y])
     coefs = list(np.arange(0.01, 3.1, 0.05))
     best_preds, best_acc, best_sc = find_softmax_coef(val_preds, targs, coefs)
@@ -237,7 +237,7 @@ if __name__ == '__main__':
     best_preds = best_preds.to(get_device())
 
     # Now features
-    print ("Extracting train feats")
+    print ('Extracting train feats')
     train_preds, train_gt, train_feats, train_preds2 = get_predictions(learn.model, data.train_dl)
     # train_feats, train_gt = get_train_features(learn, augment=0)
     distance_matrix_imgs = batched_dmv(val_feats, train_feats)
@@ -258,28 +258,28 @@ if __name__ == '__main__':
 
     out_preds = out_preds.to(get_device())
     targs = targs.to(get_device())
-    print ("Raw Val top1 acc   = ", accuracy(val_preds, targs).cpu().item())
-    print ("Raw Val top5 acc   = ", topkacc(val_preds, targs, k=5).cpu().item())
-    print ("Raw Val top12 acc  = ", topkacc(val_preds, targs, k=12).cpu().item())
-    print ("SM  Val top1 acc   = ", accuracy(best_preds, targs).cpu().item())
-    print ("SM  Val top5 acc   = ", topkacc(best_preds, targs, k=5).cpu().item())
-    print ("SM  Val top12 acc  = ", topkacc(best_preds, targs, k=12).cpu().item())
-    print ("Cls Val top1 acc   = ", accuracy(class_sims, targs).cpu().item())
-    print ("Cls Val top5 acc   = ", topkacc(class_sims, targs, k=5).cpu().item())
-    print ("Cls Val top12 acc  = ", topkacc(class_sims, targs, k=12).cpu().item())
-    print ("CM Val top1 acc   = ", accuracy(class_preds, targs).cpu().item())
-    print ("CM Val top5 acc   = ", topkacc(class_preds, targs, k=5).cpu().item())
-    print ("CM Val top12 acc  = ", topkacc(class_preds, targs, k=12).cpu().item())
-    print ("Mix Val top1 acc   = ", accuracy(out_preds, targs).cpu().item())
-    print ("Mix Val top5 acc   = ", topkacc(out_preds, targs, k=5).cpu().item())
-    print ("Mix Val top12 acc  = ", topkacc(out_preds, targs, k=12).cpu().item())
+    print ('Raw Val top1 acc   = ', accuracy(val_preds, targs).cpu().item())
+    print ('Raw Val top5 acc   = ', topkacc(val_preds, targs, k=5).cpu().item())
+    print ('Raw Val top12 acc  = ', topkacc(val_preds, targs, k=12).cpu().item())
+    print ('SM  Val top1 acc   = ', accuracy(best_preds, targs).cpu().item())
+    print ('SM  Val top5 acc   = ', topkacc(best_preds, targs, k=5).cpu().item())
+    print ('SM  Val top12 acc  = ', topkacc(best_preds, targs, k=12).cpu().item())
+    print ('Cls Val top1 acc   = ', accuracy(class_sims, targs).cpu().item())
+    print ('Cls Val top5 acc   = ', topkacc(class_sims, targs, k=5).cpu().item())
+    print ('Cls Val top12 acc  = ', topkacc(class_sims, targs, k=12).cpu().item())
+    print ('CM Val top1 acc   = ', accuracy(class_preds, targs).cpu().item())
+    print ('CM Val top5 acc   = ', topkacc(class_preds, targs, k=5).cpu().item())
+    print ('CM Val top12 acc  = ', topkacc(class_preds, targs, k=12).cpu().item())
+    print ('Mix Val top1 acc   = ', accuracy(out_preds, targs).cpu().item())
+    print ('Mix Val top5 acc   = ', topkacc(out_preds, targs, k=5).cpu().item())
+    print ('Mix Val top12 acc  = ', topkacc(out_preds, targs, k=12).cpu().item())
 
-    print ("Saving train values")
+    print ('Saving train values')
     values = {
-        "train_gt": train_gt.detach().cpu(),
-        "train_feats": train_feats.detach().cpu(),
-        "classes": classes,
-        "thresholds": {
+        'train_gt': train_gt.detach().cpu(),
+        'train_feats': train_feats.detach().cpu(),
+        'classes': classes,
+        'thresholds': {
             'classifier_softmax_temp' : best_sc,
             'feature_softmax_temp'    : class_sc,
             'mixing_value'            : best_p,
@@ -287,5 +287,5 @@ if __name__ == '__main__':
     }
     torch.save(values, 'data/models/' + NAME + '-values.pth')
 
-    print ("Saving final model")
+    print ('Saving final model')
     learn.save(NAME, with_opt=False)

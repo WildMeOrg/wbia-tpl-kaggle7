@@ -64,7 +64,7 @@ learn.split([learn.model.cnn[26], learn.model.head])
 learn.freeze()
 learn.clip_grad();
 LOADED = False
-print ("Stage one, training only head")
+print ('Stage one, training only head')
 if LOAD_IF_CAN:
     try:
         learn.load(loadname)
@@ -91,9 +91,9 @@ if LOAD_IF_CAN:
 if not LOADED:
     learn.fit_one_cycle(100, lrs)
     learn.save(name + '_unfreeze')
-print ("Stage 2 done, starting stage 3")
+print ('Stage 2 done, starting stage 3')
 
-print ("Stage 2 done, stage 3 done")
+print ('Stage 2 done, stage 3 done')
 
 ####### Validation
 df = pd.read_csv('data/train.csv')
@@ -138,14 +138,14 @@ except:
 create_submission(pit1.cpu(), learn.data, name, classes)
 print ('new_whales at 1st pos:', pd.read_csv(f'subs/{name}.csv.gz').Id.str.split().apply(lambda x: x[0] == 'new_whale').mean())
 if SAVE_TEST_MATRIX:
-    print ("Saving test feats")
+    print ('Saving test feats')
     test_shortlist = get_shortlist_fnames_test(distance_matrix_idxs_test, cm3, df, learn, [])
-    torch.save({"test_feats": test_feats.detach().cpu(),
-                "best_preds": pit1.detach().cpu(),
-                "classes": classes,
-                "thresholds": thresholds,
-                "distance_matrix_idxs_test": distance_matrix_idxs_test,
+    torch.save({'test_feats': test_feats.detach().cpu(),
+                'best_preds': pit1.detach().cpu(),
+                'classes': classes,
+                'thresholds': thresholds,
+                'distance_matrix_idxs_test': distance_matrix_idxs_test,
                 'test_shortlist': test_shortlist,
-                "train_labels": train_labels.detach().cpu(),
-                "train_feats": train_feats.detach().cpu(),
+                'train_labels': train_labels.detach().cpu(),
+                'train_feats': train_feats.detach().cpu(),
                 }, name + 'test_feats.pt')
