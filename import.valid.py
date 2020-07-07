@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from os.path import join, splitext
 import wbia
 import uuid
