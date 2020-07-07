@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from fastprogress import master_bar, progress_bar
 #import matplotlib.pyplot as plt
 from fastai.vision import *

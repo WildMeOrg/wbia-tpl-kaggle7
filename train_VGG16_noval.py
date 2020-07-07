@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from fastprogress import master_bar, progress_bar
 from fastai.vision import *
 from fastai.metrics import accuracy

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 with open('data/train.csv', 'r') as fr:
     lines = fr.readlines()
 with open('data/blacklist_verified_and_halves.csv', 'r') as bf:
