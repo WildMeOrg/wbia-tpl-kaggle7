@@ -14,12 +14,12 @@ version_list = [
 for version in version_list:
     bbox_df.head()
 
-    crop_path = os.path.join('data', 'crop_%s' % (version, ))
+    crop_path = os.path.join('data', 'crop_%s' % (version,))
 
     if not os.path.exists(crop_path):
         os.mkdir(crop_path)
 
-    df = pd.read_csv('data/%s.csv' % (version, ))
+    df = pd.read_csv('data/%s.csv' % (version,))
     df.head()
     df_ = df.merge(bbox_df, on=['Image'])
 

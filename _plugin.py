@@ -37,16 +37,16 @@ BACKEND_URL = None
 
 def _wbia_plugin_kaggle7_check_container(url):
     endpoints = {
-        'api/classify'  : ['POST'],
+        'api/classify': ['POST'],
     }
     flag_list = []
     endpoint_list = list(endpoints.keys())
     for endpoint in endpoint_list:
-        print('Checking endpoint %r against url %r' % (endpoint, url, ))
+        print('Checking endpoint %r against url %r' % (endpoint, url,))
         flag = False
         required_methods = set(endpoints[endpoint])
         supported_methods = None
-        url_ = 'http://%s/%s' % (url, endpoint, )
+        url_ = 'http://%s/%s' % (url, endpoint,)
 
         try:
             response = requests.options(url_, timeout=1)
@@ -61,17 +61,26 @@ def _wbia_plugin_kaggle7_check_container(url):
             if len(required_methods - supported_methods) == 0:
                 flag = True
         if not flag:
-            args = (endpoint, )
-            print('[wbia_kaggle7 - FAILED CONTAINER ENSURE CHECK] Endpoint %r failed the check' % args)
-            print('\tRequired Methods:  %r' % (required_methods, ))
-            print('\tSupported Methods: %r' % (supported_methods, ))
-        print('\tFlag: %r' % (flag, ))
+            args = (endpoint,)
+            print(
+                '[wbia_kaggle7 - FAILED CONTAINER ENSURE CHECK] Endpoint %r failed the check'
+                % args
+            )
+            print('\tRequired Methods:  %r' % (required_methods,))
+            print('\tSupported Methods: %r' % (supported_methods,))
+        print('\tFlag: %r' % (flag,))
         flag_list.append(flag)
     supported = np.all(flag_list)
     return supported
 
 
-docker_control.docker_register_config(None, 'flukebook_kaggle7', 'wildme.azurecr.io/wbia/kaggle7:latest', run_args={'_internal_port': 5000, '_external_suggested_port': 5000}, container_check_func=_wbia_plugin_kaggle7_check_container)
+docker_control.docker_register_config(
+    None,
+    'flukebook_kaggle7',
+    'wildme.azurecr.io/wbia/kaggle7:latest',
+    run_args={'_internal_port': 5000, '_external_suggested_port': 5000},
+    container_check_func=_wbia_plugin_kaggle7_check_container,
+)
 
 
 @register_ibs_method
@@ -82,8 +91,10 @@ def wbia_plugin_kaggle7_ensure_backend(ibs, container_name='flukebook_kaggle7', 
         # Register depc blacklist
         prop_list = [None, 'theta', 'verts', 'species', 'name', 'yaws']
         for prop in prop_list:
-            ibs.depc_annot.register_delete_table_exclusion('KaggleSevenChip',           prop)
-            ibs.depc_annot.register_delete_table_exclusion('KaggleSevenIdentification', prop)
+            ibs.depc_annot.register_delete_table_exclusion('KaggleSevenChip', prop)
+            ibs.depc_annot.register_delete_table_exclusion(
+                'KaggleSevenIdentification', prop
+            )
 
         BACKEND_URLS = ibs.docker_ensure(container_name)
         if len(BACKEND_URLS) == 0:
@@ -92,24 +103,27 @@ def wbia_plugin_kaggle7_ensure_backend(ibs, container_name='flukebook_kaggle7', 
             BACKEND_URL = BACKEND_URLS[0]
         else:
             BACKEND_URL = BACKEND_URLS[0]
-            args = (BACKEND_URLS, BACKEND_URL, )
+            args = (
+                BACKEND_URLS,
+                BACKEND_URL,
+            )
             print('[WARNING] Multiple BACKEND_URLS:\n\tFound: %r\n\tUsing: %r' % args)
     return BACKEND_URL
 
 
 class KaggleSevenChipConfig(dt.Config):  # NOQA
-    _param_info_list = [
-        ut.ParamInfo('chip_padding', 32),
-        ut.ParamInfo('ext', '.jpg')
-    ]
+    _param_info_list = [ut.ParamInfo('chip_padding', 32), ut.ParamInfo('ext', '.jpg')]
 
 
 @register_preproc_annot(
-    tablename='KaggleSevenChip', parents=[ANNOTATION_TABLE],
-    colnames=['image', 'image_width', 'image_height'], coltypes=[dt.ExternType(vt.imread, vt.imwrite), int, int],
+    tablename='KaggleSevenChip',
+    parents=[ANNOTATION_TABLE],
+    colnames=['image', 'image_width', 'image_height'],
+    coltypes=[dt.ExternType(vt.imread, vt.imwrite), int, int],
     configclass=KaggleSevenChipConfig,
     fname='kaggle7',
-    chunksize=128)
+    chunksize=128,
+)
 def wbia_plugin_kaggle7_chip_depc(depc, aid_list, config):
     r"""
     Refine localizations for CurvRank with Dependency Cache (depc)
@@ -147,17 +161,17 @@ def wbia_plugin_kaggle7_chip_depc(depc, aid_list, config):
     for aid, tip_list, size, chip in zipped:
         h0, w0, c0 = chip.shape
         notch = tip_list[0].copy()
-        left  = tip_list[1].copy()
+        left = tip_list[1].copy()
         right = tip_list[2].copy()
 
         size = np.array(size, dtype=np.float32)
         notch /= size
-        left  /= size
+        left /= size
         right /= size
 
         size = np.array([w0, h0], dtype=np.float32)
         notch *= size
-        left  *= size
+        left *= size
         right *= size
 
         chip_ = chip.copy()
@@ -185,8 +199,8 @@ def wbia_plugin_kaggle7_chip_depc(depc, aid_list, config):
         vert_list_ = vt.transform_points_with_homography(H, vert_list.T).T
         notch, left, right = vert_list_
 
-        left[0]  -= padding // 2
-        left[1]  -= padding // 2
+        left[0] -= padding // 2
+        left[1] -= padding // 2
         notch[1] += padding // 2
         right[0] += padding // 2
         right[1] -= padding // 2
@@ -207,10 +221,19 @@ def wbia_plugin_kaggle7_chip_depc(depc, aid_list, config):
         chip_ = chip_[:h0, :w0, :]
         chip_h, chip_w = chip_.shape[:2]
 
-        yield (chip_, chip_w, chip_h, )
+        yield (
+            chip_,
+            chip_w,
+            chip_h,
+        )
 
 
-@register_route('/api/plugin/kaggle7/chip/src/<aid>/', methods=['GET'], __route_prefix_check__=False, __route_authenticate__=False)
+@register_route(
+    '/api/plugin/kaggle7/chip/src/<aid>/',
+    methods=['GET'],
+    __route_prefix_check__=False,
+    __route_authenticate__=False,
+)
 def kaggle7_chip_src(aid=None, ibs=None, **kwargs):
     from six.moves import cStringIO as StringIO
     from PIL import Image  # NOQA
@@ -223,7 +246,9 @@ def kaggle7_chip_src(aid=None, ibs=None, **kwargs):
 
     aid = int(aid)
     aid_list = [aid]
-    chip_paths = ibs.depc_annot.get('KaggleSevenChip', aid_list, 'image', read_extern=False, ensure=True)
+    chip_paths = ibs.depc_annot.get(
+        'KaggleSevenChip', aid_list, 'image', read_extern=False, ensure=True
+    )
     chip_path = chip_paths[0]
 
     # Load image
@@ -256,10 +281,7 @@ def get_b64_image_str(ibs, image_filepath, **kwargs):
 def wbia_plugin_kaggle7_identify_aid(ibs, kchip_filepath, config={}, **kwargs):
     url = ibs.wbia_plugin_kaggle7_ensure_backend(**kwargs)
     image_base64_str = get_b64_image_str(ibs, kchip_filepath, **config)
-    data = {
-        'image': image_base64_str,
-        'config': config
-    }
+    data = {'image': image_base64_str, 'config': config}
     url_ = 'http://%s/api/classify' % (url)
     # print('Sending identify to %s' % url)
     response = requests.post(url_, json=data, timeout=120)
@@ -272,16 +294,19 @@ def wbia_plugin_kaggle7_identify_aid(ibs, kchip_filepath, config={}, **kwargs):
 class KaggleSevenIdentificationConfig(dt.Config):  # NOQA
     _param_info_list = [
         ut.ParamInfo('model_tag', 'crc'),
-        ut.ParamInfo('k',         100),  # Return top-k results
+        ut.ParamInfo('k', 100),  # Return top-k results
     ]
 
 
 @register_preproc_annot(
-    tablename='KaggleSevenIdentification', parents=['KaggleSevenChip'],
-    colnames=['response'], coltypes=[dict],
+    tablename='KaggleSevenIdentification',
+    parents=['KaggleSevenChip'],
+    colnames=['response'],
+    coltypes=[dict],
     configclass=KaggleSevenIdentificationConfig,
     fname='kaggle7',
-    chunksize=128)
+    chunksize=128,
+)
 def wbia_plugin_kaggle7_identification_depc(depc, kchip_rowid_list, config):
     r"""
     Refine localizations for CurvRank with Dependency Cache (depc)
@@ -308,7 +333,9 @@ def wbia_plugin_kaggle7_identification_depc(depc, kchip_rowid_list, config):
     """
     ibs = depc.controller
 
-    kchip_filepath_list = depc.get_native('KaggleSevenChip', kchip_rowid_list, 'image', read_extern=False)
+    kchip_filepath_list = depc.get_native(
+        'KaggleSevenChip', kchip_rowid_list, 'image', read_extern=False
+    )
 
     model_tag = config['model_tag']
     topk = config['k']
@@ -318,17 +345,17 @@ def wbia_plugin_kaggle7_identification_depc(depc, kchip_rowid_list, config):
     }
     for kchip_filepath in tqdm.tqdm(kchip_filepath_list):
         response = ibs.wbia_plugin_kaggle7_identify_aid(kchip_filepath, config=config_)
-        yield (response, )
+        yield (response,)
 
 
 def get_match_results(depc, qaid_list, daid_list, score_list, config):
     """ converts table results into format for ipython notebook """
-    #qaid_list, daid_list = request.get_parent_rowids()
-    #score_list = request.score_list
-    #config = request.config
+    # qaid_list, daid_list = request.get_parent_rowids()
+    # score_list = request.score_list
+    # config = request.config
 
     unique_qaids, groupxs = ut.group_indices(qaid_list)
-    #grouped_qaids_list = ut.apply_grouping(qaid_list, groupxs)
+    # grouped_qaids_list = ut.apply_grouping(qaid_list, groupxs)
     grouped_daids = ut.apply_grouping(daid_list, groupxs)
     grouped_scores = ut.apply_grouping(score_list, groupxs)
 
@@ -345,7 +372,7 @@ def get_match_results(depc, qaid_list, daid_list, score_list, config):
         daid_list_ = np.array(daids)
         dnid_list_ = np.array(dnids)
 
-        is_valid = (daid_list_ != qaid)
+        is_valid = daid_list_ != qaid
         daid_list_ = daid_list_.compress(is_valid)
         dnid_list_ = dnid_list_.compress(is_valid)
         annot_scores = annot_scores.compress(is_valid)
@@ -378,6 +405,7 @@ class KaggleSevenConfig(dt.Config):  # NOQA
         >>> print(result)
         KaggleSeven(dim_size=2000)
     """
+
     def get_param_info_list(self):
         return []
 
@@ -390,7 +418,14 @@ class KaggleSevenRequest(dt.base.VsOneSimilarityRequest):
     def get_fmatch_overlayed_chip(request, aid_list, config=None):
         depc = request.depc
         ibs = depc.controller
-        chip_paths = ibs.depc_annot.get('KaggleSevenChip', aid_list, 'image', config=config, read_extern=False, ensure=True)
+        chip_paths = ibs.depc_annot.get(
+            'KaggleSevenChip',
+            aid_list,
+            'image',
+            config=config,
+            read_extern=False,
+            ensure=True,
+        )
         chips = list(map(vt.imread, chip_paths))
         return chips
 
@@ -398,6 +433,7 @@ class KaggleSevenRequest(dt.base.VsOneSimilarityRequest):
         # HACK FOR WEB VIEWER
         chips = request.get_fmatch_overlayed_chip([cm.qaid, aid], config=request.config)
         import vtool as vt
+
         out_img = vt.stack_image_list(chips)
         return out_img
 
@@ -406,8 +442,7 @@ class KaggleSevenRequest(dt.base.VsOneSimilarityRequest):
         score_list = ut.take_column(result_list, 0)
         depc = request.depc
         config = request.config
-        cm_list = list(get_match_results(depc, qaid_list, daid_list,
-                                         score_list, config))
+        cm_list = list(get_match_results(depc, qaid_list, daid_list, score_list, config))
         return cm_list
 
     def execute(request, *args, **kwargs):
@@ -415,21 +450,21 @@ class KaggleSevenRequest(dt.base.VsOneSimilarityRequest):
         result_list = super(KaggleSevenRequest, request).execute(*args, **kwargs)
         qaids = kwargs.pop('qaids', None)
         if qaids is not None:
-            result_list = [
-                result for result in result_list
-                if result.qaid in qaids
-            ]
+            result_list = [result for result in result_list if result.qaid in qaids]
         return result_list
 
 
 @register_preproc_annot(
-    tablename='KaggleSeven', parents=[ANNOTATION_TABLE, ANNOTATION_TABLE],
-    colnames=['score'], coltypes=[float],
+    tablename='KaggleSeven',
+    parents=[ANNOTATION_TABLE, ANNOTATION_TABLE],
+    colnames=['score'],
+    coltypes=[float],
     configclass=KaggleSevenConfig,
     requestclass=KaggleSevenRequest,
     fname='kaggle7',
     rm_extern_on_delete=True,
-    chunksize=None)
+    chunksize=None,
+)
 def wbia_plugin_kaggle7(depc, qaid_list, daid_list, config):
     r"""
     CommandLine:
@@ -501,8 +536,15 @@ def wbia_plugin_kaggle7(depc, qaid_list, daid_list, config):
         name_counter = name_counter_dict.get(name, 0)
         if name_counter <= 0:
             if name_score > 0.01:
-                args = (name, name_score, len(daids), )
-                print('Suggested match name = %r with score = %0.04f is not in the daids (total %d)' % args)
+                args = (
+                    name,
+                    name_score,
+                    len(daids),
+                )
+                print(
+                    'Suggested match name = %r with score = %0.04f is not in the daids (total %d)'
+                    % args
+                )
             continue
         assert name_counter >= 1
         annot_score = name_score / name_counter
@@ -511,7 +553,7 @@ def wbia_plugin_kaggle7(depc, qaid_list, daid_list, config):
     dname_list = ibs.get_annot_name_texts(daid_list)
     for qaid, daid, dname in zip(qaid_list, daid_list, dname_list):
         value = name_score_dict.get(dname, 0)
-        yield (value, )
+        yield (value,)
 
 
 if __name__ == '__main__':
@@ -520,6 +562,8 @@ if __name__ == '__main__':
         python -m wbia_kaggle7._plugin --allexamples
     """
     import multiprocessing
+
     multiprocessing.freeze_support()  # for win32
     import utool as ut  # NOQA
+
     ut.doctest_funcs()

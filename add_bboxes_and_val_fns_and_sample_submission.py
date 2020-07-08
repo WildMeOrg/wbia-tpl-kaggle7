@@ -19,11 +19,11 @@ test_df = test_df.rename(columns={'ID': 'Id'})
 
 train_df_image_set = set(train_df.Image)
 valid_df_image_set = set(valid_df.Image)
-test_df_image_set  = set(test_df.Image)
+test_df_image_set = set(test_df.Image)
 
 train_df_id_set = set(train_df.Id)
 valid_df_id_set = set(valid_df.Id)
-test_df_id_set  = set(valid_df.Id)
+test_df_id_set = set(valid_df.Id)
 
 assert len(train_df_image_set & valid_df_image_set) == 0
 # assert len(train_df_image_set & test_df_image_set)  == 0

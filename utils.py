@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 from fastprogress import master_bar, progress_bar
-#import matplotlib.pyplot as plt
+
+# import matplotlib.pyplot as plt
 from fastai.vision import *
 from fastai.metrics import accuracy
 from fastai.basic_data import *
-#from skimage.util import montage
+
+# from skimage.util import montage
 import pandas as pd
 from torch import optim
 import re
@@ -24,7 +26,7 @@ from arch import *
 
 def mapk(preds, targs, k=5):
     if type(preds) is list:
-        return torch.cat([mapkfast(p, targs, k=k).view(1) for p in preds ]).mean()
+        return torch.cat([mapkfast(p, targs, k=k).view(1) for p in preds]).mean()
     return mapkfast(preds, targs, k=k)
 
 
@@ -77,7 +79,7 @@ def find_softmax_coef(preds, targs, softmax_coefs):
             best_preds = preds_
             best_score = score
             best_sc = sc
-    print ('best softmax=', best_sc)
+    print('best softmax=', best_sc)
     return best_preds, best_score, best_sc
 
 
@@ -86,16 +88,24 @@ def get_train_features(learn, augment=3):
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
     try:
-        all_preds0, all_gt0, all_feats0, all_preds20 = get_predictions(learn.model,learn.data.train_dl)
+        all_preds0, all_gt0, all_feats0, all_preds20 = get_predictions(
+            learn.model, learn.data.train_dl
+        )
     except:
-        all_preds0, all_gt0, all_feats0, all_preds20 = get_predictions_non_PCB(learn.model,learn.data.train_dl)
+        all_preds0, all_gt0, all_feats0, all_preds20 = get_predictions_non_PCB(
+            learn.model, learn.data.train_dl
+        )
     for i in range(max(augment, 0)):
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
         try:
-            all_preds00, all_gt00, all_feats00, all_preds200 = get_predictions(learn.model,learn.data.train_dl)
+            all_preds00, all_gt00, all_feats00, all_preds200 = get_predictions(
+                learn.model, learn.data.train_dl
+            )
         except:
-            all_preds00, all_gt00, all_feats00, all_preds200 =  get_predictions_non_PCB(learn.model,learn.data.train_dl)
+            all_preds00, all_gt00, all_feats00, all_preds200 = get_predictions_non_PCB(
+                learn.model, learn.data.train_dl
+            )
         all_gt0 = torch.cat([all_gt0, all_gt00], dim=0)
         all_feats0 = torch.cat([all_feats0, all_feats00], dim=0)
     train_feats = all_feats0
@@ -135,9 +145,14 @@ def write_augmentations(df, tfms):
         image = open_image(path)
         print('\t', path, image)
 
-        image.save('data/augmentations/%s_original%s' % (basename, ext, ))
+        image.save('data/augmentations/%s_original%s' % (basename, ext,))
         for version in range(5):
-            image_ = image.apply_tfms(tfms[0], size=(SZH, SZW), resize_method=ResizeMethod.SQUISH, padding_mode='zeros')
+            image_ = image.apply_tfms(
+                tfms[0],
+                size=(SZH, SZW),
+                resize_method=ResizeMethod.SQUISH,
+                padding_mode='zeros',
+            )
             c, h, w = image_.shape
 
             h_ = h // grid[0]
@@ -160,7 +175,9 @@ def write_augmentations(df, tfms):
                     image_.data[1, :, (grid_w * w_) + offset] = color[1]
                     image_.data[2, :, (grid_w * w_) + offset] = color[2]
 
-            image_.save('data/augmentations/%s_augmented_%d%s' % (basename, version, ext, ))
+            image_.save(
+                'data/augmentations/%s_augmented_%d%s' % (basename, version, ext,)
+            )
 
 
 def get_predictions(model, val_loader):
@@ -169,28 +186,28 @@ def get_predictions(model, val_loader):
     model.eval()
     all_preds = []
     all_confs = []
-    all_feats= []
+    all_feats = []
     all_preds2 = []
     all_gt = []
-    c= 0
+    c = 0
     with torch.no_grad():
-        for data1,label in val_loader:
+        for data1, label in val_loader:
             preds_list, feats_list = model(data1)
             all_preds.append(preds_list[-1].cpu())
-            all_preds2.append(torch.stack(preds_list[:-1],-1).cpu())
+            all_preds2.append(torch.stack(preds_list[:-1], -1).cpu())
             all_gt.append(label.cpu())
             all_feats.append(L2Norm()(torch.cat(feats_list, dim=1)).cpu())
-            #all_confs.append(confs)
+            # all_confs.append(confs)
         all_preds = torch.cat(all_preds, dim=0).cpu()
         all_feats = torch.cat(all_feats, dim=0).cpu()
-        #all_confs = torch.cat(all_confs, dim=0)
+        # all_confs = torch.cat(all_confs, dim=0)
         pred_clc = all_preds.max(dim=1)[1].cpu()
         all_gt = torch.cat(all_gt, dim=0).cpu()
-        mp5 = mapk(all_preds,all_gt, k=5).mean()
-        acc = (pred_clc==all_gt).float().mean().detach().cpu().item()
+        mp5 = mapk(all_preds, all_gt, k=5).mean()
+        acc = (pred_clc == all_gt).float().mean().detach().cpu().item()
         out = f'acc = {acc:.3f}, map5 = {mp5:.3f}'
         print(out)
-    return all_preds, all_gt,all_feats, all_preds2
+    return all_preds, all_gt, all_feats, all_preds2
 
 
 def get_predictions_non_PCB(model, val_loader):
@@ -199,56 +216,69 @@ def get_predictions_non_PCB(model, val_loader):
     model.eval()
     all_preds = []
     all_confs = []
-    all_feats= []
+    all_feats = []
     all_preds2 = []
     all_gt = []
-    c= 0
+    c = 0
     with torch.no_grad():
-        for data1,label in val_loader:
-            preds,feats, feats2 = model(data1)
+        for data1, label in val_loader:
+            preds, feats, feats2 = model(data1)
             all_preds.append(preds.cpu())
-            all_feats.append(torch.cat([L2Norm()(feats).cpu(),L2Norm()(feats2).cpu()], dim=1))
+            all_feats.append(
+                torch.cat([L2Norm()(feats).cpu(), L2Norm()(feats2).cpu()], dim=1)
+            )
             all_gt.append(label.cpu())
-            #all_confs.append(confs)
+            # all_confs.append(confs)
         all_preds = torch.cat(all_preds, dim=0).cpu()
         all_feats = torch.cat(all_feats, dim=0).cpu()
         pred_clc = all_preds.max(dim=1)[1].cpu()
         all_gt = torch.cat(all_gt, dim=0).cpu()
-        mp5 = mapk(all_preds,all_gt, k=5).mean()
-        acc = (pred_clc==all_gt).float().mean().detach().cpu().item()
+        mp5 = mapk(all_preds, all_gt, k=5).mean()
+        acc = (pred_clc == all_gt).float().mean().detach().cpu().item()
         out = f'acc = {acc:.3f}, map5 = {mp5:.3f}'
         print(out)
-    return all_preds, all_gt,all_feats,all_preds2
+    return all_preds, all_gt, all_feats, all_preds2
+
 
 def distance_matrix_vector(anchor, positive, d2_sq):
     """Given batch of anchor descriptors and positive descriptors calculate distance matrix"""
     d1_sq = torch.sum(anchor * anchor, dim=1).unsqueeze(-1)
     eps = 1e-6
-    return torch.sqrt((d1_sq.repeat(1, positive.size(0)) + torch.t(d2_sq.repeat(1, anchor.size(0)))
-                      - 2.0 * torch.bmm(anchor.unsqueeze(0), torch.t(positive).unsqueeze(0)).squeeze(0))+eps)
+    return torch.sqrt(
+        (
+            d1_sq.repeat(1, positive.size(0))
+            + torch.t(d2_sq.repeat(1, anchor.size(0)))
+            - 2.0
+            * torch.bmm(anchor.unsqueeze(0), torch.t(positive).unsqueeze(0)).squeeze(0)
+        )
+        + eps
+    )
+
 
 def dm2cm(dm, labels):
     cl = set(labels.detach().cpu().numpy())
     n_cl = len(cl)
-    dists = torch.zeros(dm.size(0),n_cl)
+    dists = torch.zeros(dm.size(0), n_cl)
     for i in range(n_cl):
         mask = labels == i
-        dists[:,i] = dm[:,mask].min(dim=1)[0]
+        dists[:, i] = dm[:, mask].min(dim=1)[0]
     return dists
+
 
 def dm2cm_with_idxs(dm, labels):
     cl = set(labels.detach().cpu().numpy())
     n_cl = len(cl)
-    dists = torch.zeros(dm.size(0),n_cl)
-    idxs = torch.zeros(dm.size(0),n_cl)
+    dists = torch.zeros(dm.size(0), n_cl)
+    idxs = torch.zeros(dm.size(0), n_cl)
     for i in range(n_cl):
         mask = labels == i
-        tt = dm[:,mask].min(dim=1)
-        dists[:,i] = tt[0]
-        iiiii = torch.arange(dm.size(1)).unsqueeze(0).expand_as(dm)[:,mask]
+        tt = dm[:, mask].min(dim=1)
+        dists[:, i] = tt[0]
+        iiiii = torch.arange(dm.size(1)).unsqueeze(0).expand_as(dm)[:, mask]
         for j in range(len(tt[1])):
-            idxs[j,i] = iiiii[0,tt[1][j]]
+            idxs[j, i] = iiiii[0, tt[1][j]]
     return dists, idxs
+
 
 def get_train_val_fnames(df, val_list):
     train_fnames = []
@@ -259,6 +289,7 @@ def get_train_val_fnames(df, val_list):
         else:
             val_fnames.append(str(i))
     return train_fnames, val_fnames
+
 
 def get_shortlist_fnames(distance_matrix_idxs, class_sims, df, val_list):
     train_fnames, val_fnames = get_train_val_fnames(df, val_list)
@@ -272,7 +303,9 @@ def get_shortlist_fnames(distance_matrix_idxs, class_sims, df, val_list):
             sl.append(train_fnames[int(iii)])
         shortlist_dict[fname] = sl
     return shortlist_dict
-def get_shortlist_fnames_test(distance_matrix_idxs, class_sims, df, learn, val_list ):
+
+
+def get_shortlist_fnames_test(distance_matrix_idxs, class_sims, df, learn, val_list):
     train_fnames, val_fnames = get_train_val_fnames(df, val_list)
     train_fnames = val_fnames + train_fnames
     test_fnames = []
@@ -290,30 +323,34 @@ def get_shortlist_fnames_test(distance_matrix_idxs, class_sims, df, learn, val_l
     return shortlist_dict
 
 
-def batched_dmv(d1,d2):
+def batched_dmv(d1, d2):
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
     out = torch.zeros(d1.size(0), d2.size(0))
-    d2_sq1 = torch.sum(d2**2, dim=1).unsqueeze(-1)
+    d2_sq1 = torch.sum(d2 ** 2, dim=1).unsqueeze(-1)
     try:
-        out = distance_matrix_vector(d1.to(get_device()),d2.to(get_device()),d2_sq1.to(get_device())).cpu()
+        out = distance_matrix_vector(
+            d1.to(get_device()), d2.to(get_device()), d2_sq1.to(get_device())
+        ).cpu()
     except:
-        out = distance_matrix_vector(d1,d2,d2_sq1).cpu()
+        out = distance_matrix_vector(d1, d2, d2_sq1).cpu()
     return out
 
 
-def open_image_grey(fn:PathOrStr, div:bool=True, convert_mode:str='RGB', cls:type=Image)->Image:
+def open_image_grey(
+    fn: PathOrStr, div: bool = True, convert_mode: str = 'RGB', cls: type = Image
+) -> Image:
     'Return `Image` object created from image in file `fn`.'
-    #fn = getattr(fn, 'path', fn)
+    # fn = getattr(fn, 'path', fn)
     x = PIL.Image.open(fn).convert(convert_mode).convert('LA').convert(convert_mode)
-    x = pil2tensor(x,np.float32)
+    x = pil2tensor(x, np.float32)
     if div:
         x.div_(255)
     return cls(x)
 
 
 class ImageListGray(ImageList):
-    def open(self, fn:PathOrStr)->Image:
+    def open(self, fn: PathOrStr) -> Image:
         return open_image_grey(fn)
         # return open_image(fn)
 
@@ -329,7 +366,7 @@ def topkacc(preds, targs, k=5, mean=True):
 
 def mapkave(preds, targs, k=5):
     pl = len(preds)
-    out = torch.stack(preds[:pl - 1], -1).mean(dim=-1)
+    out = torch.stack(preds[: pl - 1], -1).mean(dim=-1)
     return mapk(out, targs, k=k)
 
 
