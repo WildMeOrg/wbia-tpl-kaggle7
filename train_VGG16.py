@@ -64,7 +64,9 @@ if __name__ == '__main__':
     path2fn = lambda path: re.search('[\w-]*\.jpg$', path).group(0)  # NOQA
 
     num_classes = len(set(df.Id))
-    network_model, mutliple = make_new_network(num_classes, RING_HEADS, GEM_CONST, pretrained=True)
+    network_model, mutliple = make_new_network(
+        num_classes, RING_HEADS, GEM_CONST, pretrained=True
+    )
 
     tfms = (
         [
@@ -72,7 +74,9 @@ if __name__ == '__main__':
             RandTransform(tfm=contrast, kwargs={'scale': (0.5, 1.5)}),
             RandTransform(tfm=symmetric_warp, kwargs={'magnitude': (-0.01, 0.01)}),
             RandTransform(tfm=rotate, kwargs={'degrees': (-1.0, 1.0)}),
-            RandTransform(tfm=zoom, kwargs={'scale': (1.0, 1.05), 'row_pct': 0.5, 'col_pct': 0.5}),
+            RandTransform(
+                tfm=zoom, kwargs={'scale': (1.0, 1.05), 'row_pct': 0.5, 'col_pct': 0.5}
+            ),
             # RandTransform(tfm=flip_lr, kwargs={}, p=0.5),
         ],
         [
@@ -88,12 +92,13 @@ if __name__ == '__main__':
     write_augmentations(df, tfms)
 
     data = (
-        ImageListGray
-        .from_df(df, 'data/crop_train', cols=['Image'])
+        ImageListGray.from_df(df, 'data/crop_train', cols=['Image'])
         .split_by_valid_func(lambda path: path2fn(path) in val_fns)
         .label_from_func(lambda path: fn2label[path2fn(path)])
         .add_test(ImageList.from_folder('data/crop_test'))
-        .transform(tfms, size=(SZH, SZW), resize_method=ResizeMethod.SQUISH, padding_mode='zeros')
+        .transform(
+            tfms, size=(SZH, SZW), resize_method=ResizeMethod.SQUISH, padding_mode='zeros'
+        )
         .databunch(bs=BS, num_workers=NUM_WORKERS, path='data')
         .normalize(imagenet_stats)
     )
@@ -107,21 +112,24 @@ if __name__ == '__main__':
         if id_ in singleton_ids:
             singleton_idx.add(index)
 
-    top1acc_func  = partial(topkacc, k=1, mean=False)
-    top5acc_func  = partial(topkacc, k=5, mean=False)
+    top1acc_func = partial(topkacc, k=1, mean=False)
+    top5acc_func = partial(topkacc, k=5, mean=False)
     top12acc_func = partial(topkacc, k=12, mean=False)
 
-    top1acc   = Accuracy(top1acc_func,  name='top1acc',   filter_set=nonzeroton_idx)
-    top5acc   = Accuracy(top5acc_func,  name='top5acc',   filter_set=nonzeroton_idx)
-    top12acc  = Accuracy(top12acc_func, name='top12acc',  filter_set=nonzeroton_idx)
-    top1accS  = Accuracy(top1acc_func,  name='top1acc*',  filter_set=singleton_idx)
-    top5accS  = Accuracy(top5acc_func,  name='top5acc*',  filter_set=singleton_idx)
+    top1acc = Accuracy(top1acc_func, name='top1acc', filter_set=nonzeroton_idx)
+    top5acc = Accuracy(top5acc_func, name='top5acc', filter_set=nonzeroton_idx)
+    top12acc = Accuracy(top12acc_func, name='top12acc', filter_set=nonzeroton_idx)
+    top1accS = Accuracy(top1acc_func, name='top1acc*', filter_set=singleton_idx)
+    top5accS = Accuracy(top5acc_func, name='top5acc*', filter_set=singleton_idx)
     top12accS = Accuracy(top12acc_func, name='top12acc*', filter_set=singleton_idx)
 
-    learn = Learner(data, network_model,
-                       metrics=[top1acc, top5acc, top12acc, top1accS, top5accS, top12accS],
-                       loss_func=MultiCE,
-                       callback_fns=[RingLoss])
+    learn = Learner(
+        data,
+        network_model,
+        metrics=[top1acc, top5acc, top12acc, top1accS, top5accS, top12accS],
+        loss_func=MultiCE,
+        callback_fns=[RingLoss],
+    )
 
     learn.clip_grad()
     learn.split([learn.model.module.cnn, learn.model.module.head])
@@ -150,7 +158,7 @@ if __name__ == '__main__':
         if flag:
             new_model[key] = model[key]
         else:
-            print('Random: %r' % (key, ))
+            print('Random: %r' % (key,))
             new_model[key] = initialized[key]
     pretrained['model'] = new_model
     torch.save(pretrained, 'data/models/pretrained-filtered.pth')
@@ -163,17 +171,16 @@ if __name__ == '__main__':
         # (2e-4,  50),
         # (5e-4,  1000),
         # (1e-3,  100),
-
-        (1e-3,  50),
-        (1e-3,  100),
-        (2e-3,  200),
+        (1e-3, 50),
+        (1e-3, 100),
+        (2e-3, 200),
         # (1e-2,  50),
         # (1e-2,  100),
     ]
 
     for round_num, (max_lr_, num_epochs_) in enumerate(max_lr_epochs_list):
-        print ('Round %d training (freeze)' % (round_num + 1, ))
-        name = '%s-R%s-freeze' % (NAME, round_num, )
+        print('Round %d training (freeze)' % (round_num + 1,))
+        name = '%s-R%s-freeze' % (NAME, round_num,)
         try:
             learn.load(name)
         except:
@@ -191,8 +198,8 @@ if __name__ == '__main__':
             learn.fit_one_cycle(num_epochs_, max_lr_)
             learn.save(name)
 
-        print ('Round %d training (unfreeze)' % (round_num + 1, ))
-        name = '%s-R%s-unfreeze' % (NAME, round_num, )
+        print('Round %d training (unfreeze)' % (round_num + 1,))
+        name = '%s-R%s-unfreeze' % (NAME, round_num,)
         try:
             learn.load(name)
         except:
@@ -213,12 +220,13 @@ if __name__ == '__main__':
     ####
 
     data = (
-        ImageListGray
-        .from_df(df, 'data/crop_train', cols=['Image'])
+        ImageListGray.from_df(df, 'data/crop_train', cols=['Image'])
         .split_by_valid_func(lambda path: path2fn(path) in val_fns)
         .label_from_func(lambda path: fn2label[path2fn(path)])
         .add_test(ImageList.from_folder('data/crop_test'))
-        .transform(tfms, size=(SZH, SZW), resize_method=ResizeMethod.SQUISH, padding_mode='zeros')
+        .transform(
+            tfms, size=(SZH, SZW), resize_method=ResizeMethod.SQUISH, padding_mode='zeros'
+        )
         .databunch(bs=1, num_workers=NUM_WORKERS, path='data')
         .normalize(imagenet_stats)
     )
@@ -226,8 +234,13 @@ if __name__ == '__main__':
     # temperature scaling
     val_preds, val_gt, val_feats, val_preds2 = get_predictions(learn.model, data.valid_dl)
     val_preds = val_preds.to(get_device())
-    print ('Finding softmax coef')
-    targs = torch.tensor([classes.index(label.obj) if label else num_classes for label in learn.data.valid_ds.y])
+    print('Finding softmax coef')
+    targs = torch.tensor(
+        [
+            classes.index(label.obj) if label else num_classes
+            for label in learn.data.valid_ds.y
+        ]
+    )
     coefs = list(np.arange(0.01, 3.1, 0.05))
     best_preds, best_acc, best_sc = find_softmax_coef(val_preds, targs, coefs)
     min_best_sc = best_sc / 2.0
@@ -238,8 +251,10 @@ if __name__ == '__main__':
     best_preds = best_preds.to(get_device())
 
     # Now features
-    print ('Extracting train feats')
-    train_preds, train_gt, train_feats, train_preds2 = get_predictions(learn.model, data.train_dl)
+    print('Extracting train feats')
+    train_preds, train_gt, train_feats, train_preds2 = get_predictions(
+        learn.model, data.train_dl
+    )
     # train_feats, train_gt = get_train_features(learn, augment=0)
     distance_matrix_imgs = batched_dmv(val_feats, train_feats)
     distance_matrix_classes = dm2cm(distance_matrix_imgs, train_gt)
@@ -255,38 +270,40 @@ if __name__ == '__main__':
     class_preds, class_acc, class_sc = find_softmax_coef(class_sims, targs, coefs)
     class_preds = class_preds.to(get_device())
 
-    out_preds, best_p, best_score = find_mixing_proportions(best_preds, class_preds, targs)
+    out_preds, best_p, best_score = find_mixing_proportions(
+        best_preds, class_preds, targs
+    )
 
     out_preds = out_preds.to(get_device())
     targs = targs.to(get_device())
-    print ('Raw Val top1 acc   = ', accuracy(val_preds, targs).cpu().item())
-    print ('Raw Val top5 acc   = ', topkacc(val_preds, targs, k=5).cpu().item())
-    print ('Raw Val top12 acc  = ', topkacc(val_preds, targs, k=12).cpu().item())
-    print ('SM  Val top1 acc   = ', accuracy(best_preds, targs).cpu().item())
-    print ('SM  Val top5 acc   = ', topkacc(best_preds, targs, k=5).cpu().item())
-    print ('SM  Val top12 acc  = ', topkacc(best_preds, targs, k=12).cpu().item())
-    print ('Cls Val top1 acc   = ', accuracy(class_sims, targs).cpu().item())
-    print ('Cls Val top5 acc   = ', topkacc(class_sims, targs, k=5).cpu().item())
-    print ('Cls Val top12 acc  = ', topkacc(class_sims, targs, k=12).cpu().item())
-    print ('CM Val top1 acc   = ', accuracy(class_preds, targs).cpu().item())
-    print ('CM Val top5 acc   = ', topkacc(class_preds, targs, k=5).cpu().item())
-    print ('CM Val top12 acc  = ', topkacc(class_preds, targs, k=12).cpu().item())
-    print ('Mix Val top1 acc   = ', accuracy(out_preds, targs).cpu().item())
-    print ('Mix Val top5 acc   = ', topkacc(out_preds, targs, k=5).cpu().item())
-    print ('Mix Val top12 acc  = ', topkacc(out_preds, targs, k=12).cpu().item())
+    print('Raw Val top1 acc   = ', accuracy(val_preds, targs).cpu().item())
+    print('Raw Val top5 acc   = ', topkacc(val_preds, targs, k=5).cpu().item())
+    print('Raw Val top12 acc  = ', topkacc(val_preds, targs, k=12).cpu().item())
+    print('SM  Val top1 acc   = ', accuracy(best_preds, targs).cpu().item())
+    print('SM  Val top5 acc   = ', topkacc(best_preds, targs, k=5).cpu().item())
+    print('SM  Val top12 acc  = ', topkacc(best_preds, targs, k=12).cpu().item())
+    print('Cls Val top1 acc   = ', accuracy(class_sims, targs).cpu().item())
+    print('Cls Val top5 acc   = ', topkacc(class_sims, targs, k=5).cpu().item())
+    print('Cls Val top12 acc  = ', topkacc(class_sims, targs, k=12).cpu().item())
+    print('CM Val top1 acc   = ', accuracy(class_preds, targs).cpu().item())
+    print('CM Val top5 acc   = ', topkacc(class_preds, targs, k=5).cpu().item())
+    print('CM Val top12 acc  = ', topkacc(class_preds, targs, k=12).cpu().item())
+    print('Mix Val top1 acc   = ', accuracy(out_preds, targs).cpu().item())
+    print('Mix Val top5 acc   = ', topkacc(out_preds, targs, k=5).cpu().item())
+    print('Mix Val top12 acc  = ', topkacc(out_preds, targs, k=12).cpu().item())
 
-    print ('Saving train values')
+    print('Saving train values')
     values = {
         'train_gt': train_gt.detach().cpu(),
         'train_feats': train_feats.detach().cpu(),
         'classes': classes,
         'thresholds': {
-            'classifier_softmax_temp' : best_sc,
-            'feature_softmax_temp'    : class_sc,
-            'mixing_value'            : best_p,
+            'classifier_softmax_temp': best_sc,
+            'feature_softmax_temp': class_sc,
+            'mixing_value': best_p,
         },
     }
     torch.save(values, 'data/models/' + NAME + '-values.pth')
 
-    print ('Saving final model')
+    print('Saving final model')
     learn.save(NAME, with_opt=False)

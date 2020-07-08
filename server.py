@@ -18,8 +18,8 @@ APP = Flask(__name__)
 API = Api(APP)
 
 NETWORK_MODEL_TAG = None
-NETWORK           = None
-NETWORK_VALUES    = None
+NETWORK = None
+NETWORK_VALUES = None
 
 model_url_dict = {
     'crc': 'https://cthulhu.dyn.wildme.io/public/models/kaggle7.crc.final.1.pth',
@@ -63,22 +63,28 @@ class Kaggle7(Resource):
 
                 model_url = model_url_dict.get(model_tag, None)
 
-            assert model_url is not None, 'Model tag %r is not recognized' % (model_tag, )
+            assert model_url is not None, 'Model tag %r is not recognized' % (model_tag,)
             if model_tag != NETWORK_MODEL_TAG:
                 with ut.Timer('Loading network'):
-                    print('Loading network from weights %r' % (model_tag, ))
+                    print('Loading network from weights %r' % (model_tag,))
                     values_url = model_url.replace('.pth', '.values.pth')
 
                     # Download files
-                    model_filepath = ut.grab_file_url(model_url, appname='kaggle7', check_hash=True)
-                    values_filepath = ut.grab_file_url(values_url, appname='kaggle7', check_hash=True)
+                    model_filepath = ut.grab_file_url(
+                        model_url, appname='kaggle7', check_hash=True
+                    )
+                    values_filepath = ut.grab_file_url(
+                        values_url, appname='kaggle7', check_hash=True
+                    )
 
                     model_values = torch.load(values_filepath)
                     classes = model_values['classes']
                     num_classes = len(classes)
 
                     model_weights = torch.load(model_filepath, map_location=get_device())
-                    network_model, mutliple = make_new_network(num_classes, RING_HEADS, GEM_CONST, pretrained=False)
+                    network_model, mutliple = make_new_network(
+                        num_classes, RING_HEADS, GEM_CONST, pretrained=False
+                    )
 
                     if mutliple:
                         pass
@@ -91,10 +97,10 @@ class Kaggle7(Resource):
                     network_model.eval()
 
                     NETWORK_MODEL_TAG = model_tag
-                    NETWORK           = network_model
-                    NETWORK_VALUES    = model_values
+                    NETWORK = network_model
+                    NETWORK_VALUES = model_values
 
-            print('Using network %r' % (NETWORK_MODEL_TAG, ))
+            print('Using network %r' % (NETWORK_MODEL_TAG,))
             with ut.Timer('Loading input tensor'):
                 input_image = image.convert(CMODE).convert('LA').convert(CMODE)
                 input_image = TFRM_RESIZE(input_image)
@@ -108,7 +114,7 @@ class Kaggle7(Resource):
 
             # Run inference
             with ut.Timer('Inference'):
-                print('Running inference on input tensor %r' % (input_tensor.size(), ))
+                print('Running inference on input tensor %r' % (input_tensor.size(),))
                 output = NETWORK(input_tensor)
                 print('...done')
                 preds_list, feats_list = output
@@ -122,7 +128,9 @@ class Kaggle7(Resource):
                 print('...classifier')
                 # Post Process classification
                 classifier_temp = NETWORK_VALUES['thresholds']['classifier_softmax_temp']
-                classifier_prediction = torch.softmax(prediction_raw / classifier_temp, dim=0)
+                classifier_prediction = torch.softmax(
+                    prediction_raw / classifier_temp, dim=0
+                )
 
             with ut.Timer('Post3'):
                 # Post process features
@@ -143,7 +151,9 @@ class Kaggle7(Resource):
                 print('...mixing')
                 p = NETWORK_VALUES['thresholds']['mixing_value']
                 classifier_prediction = classifier_prediction.to('cpu')
-                final_prediction = p * classifier_prediction + (1.0 - p) * features_prediction
+                final_prediction = (
+                    p * classifier_prediction + (1.0 - p) * features_prediction
+                )
 
             with ut.Timer('Collection'):
                 print('Collecting prediction')
