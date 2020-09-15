@@ -50,7 +50,7 @@ def _wbia_plugin_kaggle7_check_container(url):
 
         try:
             response = requests.options(url_, timeout=1)
-        except:
+        except Exception:
             response = None
 
         if response is not None and response.status_code:

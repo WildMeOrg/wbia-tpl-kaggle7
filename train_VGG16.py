@@ -89,7 +89,7 @@ if __name__ == '__main__':
         ],
     )
 
-    write_augmentations(df, tfms)
+    write_augmentations(df, tfms, SZH, SZW, RING_HEADS)
 
     data = (
         ImageListGray.from_df(df, 'data/crop_train', cols=['Image'])
@@ -183,7 +183,7 @@ if __name__ == '__main__':
         name = '%s-R%s-freeze' % (NAME, round_num,)
         try:
             learn.load(name)
-        except:
+        except Exception:
             learn.freeze()
 
             # # Find lr
@@ -202,7 +202,7 @@ if __name__ == '__main__':
         name = '%s-R%s-unfreeze' % (NAME, round_num,)
         try:
             learn.load(name)
-        except:
+        except Exception:
             learn.unfreeze()
 
             # # Find lr

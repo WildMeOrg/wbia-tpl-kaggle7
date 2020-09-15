@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 from os.path import abspath, join, exists
 import numpy as np
 import utool as ut
@@ -13,12 +12,12 @@ import cv2
 
 
 MIN_AIDS = 1
-MAX_AIDS = 20
+MAX_AIDS = np.inf
 MAX_NAMES = np.inf
 PADDING = 32
 
 
-url = 'https://wildbookiarepository.azureedge.net/random/humpback.all.csv'
+url = 'https://wildbookiarepository.azureedge.net/random/humpback.crc.csv'
 local_filepath = ut.download_url(url)
 filepath = abspath(local_filepath)
 
@@ -47,65 +46,35 @@ ibs.delete_empty_nids()
 current_name_list = ibs.get_name_texts(ibs.get_valid_nids())
 unknown_name_list = list(set(flukebook_name_text_list) - set(current_name_list))
 
-print('FB Num records: %d' % (len(flukebook_name_text_list),))
-print('FB Num unique acmids: %d' % (len(set(flukebook_image_acmid_list)),))
-print('FB Num unique names: %d' % (len(set(flukebook_name_text_list)),))
-print('FB Num unique gids: %d' % (len(set(gid_list)),))
-print('FB Num unique nids: %d' % (len(set(nid_list)),))
-print('FB Num unknown acmids: %d' % (gid_list.count(None),))
-print('FB Num unknown names: %d' % (len(unknown_name_list),))
-
-flag_list = [gid is not None for gid in gid_list]
-gid_list                  = ut.compress(gid_list, flag_list)
-flukebook_image_uuid_list = ut.compress(flukebook_image_uuid_list, flag_list)
-flukebook_name_text_list  = ut.compress(flukebook_name_text_list, flag_list)
-assert None not in gid_list
-
-print('DE-NONE-ING')
 print('FB Num records: %d' % (len(flukebook_name_text_list), ))
 print('FB Num unique acmids: %d' % (len(set(flukebook_image_acmid_list)), ))
 print('FB Num unique names: %d' % (len(set(flukebook_name_text_list)), ))
-
+print('FB Num unique gids: %d' % (len(set(gid_list)), ))
+print('FB Num unique nids: %d' % (len(set(nid_list)), ))
+print('FB Num unknown acmids: %d' % (gid_list.count(None), ))
+print('FB Num unknown names: %d' % (len(unknown_name_list), ))
+assert None not in gid_list
 
 # FIND DETECTIONS
 depc = ibs.depc_annot
 
-config = {
-    'algo': 'lightnet',
-    'config_filepath': 'candidacy',
-    'nms_thresh': 0.40,
-    'sensitivity': 0.4,
-}
+config = {'algo': 'lightnet', 'config_filepath' : 'candidacy', 'nms_thresh': 0.40, 'sensitivity': 0.4}
 results_list = ibs.depc_image.get_property('localizations', gid_list, None, config=config)
 
-global_gid_list = []
+global_gid_list  = []
 global_bbox_list = []
 global_name_list = []
-for gid, result_list, flukebook_name_text in zip(
-    gid_list, results_list, flukebook_name_text_list
-):
+for gid, result_list, flukebook_name_text in zip(gid_list, results_list, flukebook_name_text_list):
     status, bbox_list, theta_list, conf_list, species_list = result_list
-    zipped = sorted(
-        list(zip(conf_list, bbox_list, theta_list, species_list)), reverse=True
-    )
+    zipped = sorted(list(zip(conf_list, bbox_list, theta_list, species_list)), reverse=True)
     for conf, bbox, theta, species in zipped:
-        if conf >= 0.90 and species == 'whale_fluke':
+        if conf >= 0.80 and species == 'whale_fluke':
             global_gid_list.append(gid)
             global_bbox_list.append(bbox)
             global_name_list.append(flukebook_name_text)
             break
 
 global_aid_list = ibs.add_annots(global_gid_list, global_bbox_list)
-
-seen_aid_set = set([])
-flag_list = []
-for global_aid in global_aid_list:
-    flag = global_aid not in seen_aid_set
-    flag_list.append(flag)
-    seen_aid_set.add(global_aid)
-
-global_aid_list  = ut.compress(global_aid_list, flag_list)
-global_name_list = ut.compress(global_name_list, flag_list)
 ibs.set_annot_names(global_aid_list, global_name_list)
 
 global_name_dict = {}
@@ -176,17 +145,17 @@ for aid, tip_list, size, chip in tqdm.tqdm(zipped):
     size = np.array(size, dtype=np.float32)
 
     notch = tip_list[0].copy()
-    left = tip_list[1].copy()
+    left  = tip_list[1].copy()
     right = tip_list[2].copy()
 
     notch /= size
-    left /= size
+    left  /= size
     right /= size
 
     size = np.array([w0, h0], dtype=np.float32)
 
     notch *= size
-    left *= size
+    left  *= size
     right *= size
 
     location_list = [
@@ -198,7 +167,7 @@ for aid, tip_list, size, chip in tqdm.tqdm(zipped):
     for location, color in zip(location_list, color_list):
         cv2.circle(chip_, location, 5, color=color)
 
-    chip_filename = 'img_aid_%d_0.png' % (aid,)
+    chip_filename = 'img_aid_%d_0.png' % (aid, )
     chip_filepath = join(notch_path, chip_filename)
     cv2.imwrite(chip_filepath, chip_)
 
@@ -225,7 +194,7 @@ for aid, tip_list, size, chip in tqdm.tqdm(zipped):
     for location, color in zip(location_list, color_list):
         cv2.circle(chip1_, location, 5, color=color)
 
-    chip_filename = 'img_aid_%d_1.png' % (aid,)
+    chip_filename = 'img_aid_%d_1.png' % (aid, )
     chip_filepath = join(notch_path, chip_filename)
     cv2.imwrite(chip_filepath, chip1_)
 
@@ -249,14 +218,14 @@ for aid, tip_list, size, chip in tqdm.tqdm(zipped):
     for location, color in zip(location_list, color_list):
         cv2.circle(chip2_, location, 5, color=color)
 
-    chip_filename = 'img_aid_%d_2.png' % (aid,)
+    chip_filename = 'img_aid_%d_2.png' % (aid, )
     chip_filepath = join(notch_path, chip_filename)
     cv2.imwrite(chip_filepath, chip2_)
 
     tps.clear()
 
-    left[0] -= PADDING // 2
-    left[1] -= PADDING // 2
+    left[0]  -= PADDING // 2
+    left[1]  -= PADDING // 2
     notch[1] += PADDING // 2
     right[0] += PADDING // 2
     right[1] -= PADDING // 2
@@ -273,13 +242,13 @@ for aid, tip_list, size, chip in tqdm.tqdm(zipped):
     tps.estimateTransformation(tshape, sshape, matches)
     chip3 = tps.warpImage(chip2)
 
-    chip_filename = 'img_aid_%d_3.png' % (aid,)
+    chip_filename = 'img_aid_%d_3.png' % (aid, )
     chip_filepath = join(notch_path, chip_filename)
     cv2.imwrite(chip_filepath, chip3)
 
     chip4 = chip3[:h0, :w0, :]
 
-    chip_filename = 'img_aid_%d.png' % (aid,)
+    chip_filename = 'img_aid_%d.png' % (aid, )
     chip_filepath = join(notch_path, chip_filename)
     cv2.imwrite(chip_filepath, chip4)
     path_dict[aid] = abspath(chip_filepath)
@@ -348,19 +317,15 @@ for aid, uuid_str, chip_filepath, name_text in tqdm.tqdm(zipped):
     name_output_path = join(output_path_folders, name_text)
     if not exists(name_output_path):
         ut.ensuredir(name_output_path)
-    annot_output_filepath = join(name_output_path, '%s.jpg' % (uuid_str,))
+    annot_output_filepath = join(name_output_path, '%s.jpg' % (uuid_str, ))
     assert not exists(annot_output_filepath)
     ut.copy(chip_filepath, annot_output_filepath, verbose=False)
 
-    annot_output_filename = '%s.jpg' % (uuid_str,)
+    annot_output_filename = '%s.jpg' % (uuid_str, )
     annot_output_filepath = join(output_path_manifest, annot_output_filename)
     assert not exists(annot_output_filepath)
     ut.copy(chip_filepath, annot_output_filepath, verbose=False)
-    manifest_line = '%s,%s,%s' % (
-        annot_output_filename,
-        name_text,
-        named_humpback_unixtime,
-    )
+    manifest_line = '%s,%s,%s' % (annot_output_filename, name_text, named_humpback_unixtime, )
     manifest_dict[version].append(manifest_line)
 
 for manifest_key in manifest_dict:
@@ -368,6 +333,6 @@ for manifest_key in manifest_dict:
     manifest_list = sorted(manifest_list)
     manifest_list = ['Image,ID,Unixtime'] + manifest_list
     manifest_str = '\n'.join(manifest_list)
-    manifest_filepath = join(output_path, '%s.txt' % (manifest_key,))
+    manifest_filepath = join(output_path, '%s.txt' % (manifest_key, ))
     with open(manifest_filepath, 'w') as manifest_file:
         manifest_file.write(manifest_str)

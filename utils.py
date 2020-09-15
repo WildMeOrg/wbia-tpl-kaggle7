@@ -129,7 +129,7 @@ def find_mixing_proportions(sm_preds, sim, targs):
     return out_preds, best_p, best_score
 
 
-def write_augmentations(df, tfms):
+def write_augmentations(df, tfms, SZH, SZW, RING_HEADS):
     if not os.path.exists('data/augmentations'):
         os.mkdir('data/augmentations')
 
