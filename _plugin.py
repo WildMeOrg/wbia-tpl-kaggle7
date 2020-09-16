@@ -5,8 +5,8 @@ from wbia.control import controller_inject, docker_control
 from wbia.constants import ANNOTATION_TABLE
 import wbia.constants as const
 import utool as ut
-import dtool as dt
 import vtool as vt
+import wbia.dtool as dt
 import numpy as np
 import base64
 import requests
