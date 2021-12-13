@@ -42,11 +42,20 @@ def _wbia_plugin_kaggle7_check_container(url):
     flag_list = []
     endpoint_list = list(endpoints.keys())
     for endpoint in endpoint_list:
-        print('Checking endpoint %r against url %r' % (endpoint, url,))
+        print(
+            'Checking endpoint %r against url %r'
+            % (
+                endpoint,
+                url,
+            )
+        )
         flag = False
         required_methods = set(endpoints[endpoint])
         supported_methods = None
-        url_ = 'http://%s/%s' % (url, endpoint,)
+        url_ = 'http://%s/%s' % (
+            url,
+            endpoint,
+        )
 
         try:
             response = requests.options(url_, timeout=1)
@@ -77,7 +86,7 @@ def _wbia_plugin_kaggle7_check_container(url):
 docker_control.docker_register_config(
     None,
     'flukebook_kaggle7',
-    'wildme.azurecr.io/wbia/kaggle7:latest',
+    'wildme/wbia-plugin-kaggle7:latest',
     run_args={'_internal_port': 5000, '_external_suggested_port': 5000},
     container_check_func=_wbia_plugin_kaggle7_check_container,
 )
@@ -132,13 +141,13 @@ def wbia_plugin_kaggle7_chip_depc(depc, aid_list, config):
         python -m wbia_kaggle7._plugin --test-wbia_plugin_kaggle7_chip_depc
         python -m wbia_kaggle7._plugin --test-wbia_plugin_kaggle7_chip_depc:0
 
-    Example0:
-        >>> # ENABLE_DOCTEST
+    Example:
+        >>> # DISABLE_DOCTEST
         >>> from wbia_kaggle7._plugin import *  # NOQA
         >>> import wbia
         >>> from wbia.init import sysres
         >>> dbdir = sysres.ensure_testdb_kaggle7()
-        >>> ibs = wbia.opendb(dbdir=dbdir)
+        >>> ibs = wbia.opendb(dbdir=dbdir, allow_newdir=True)
         >>> aid_list = ibs.get_image_aids(1)
         >>> images = ibs.depc_annot.get('KaggleSevenChip', aid_list, 'image')
         >>> image = images[0]
@@ -315,14 +324,14 @@ def wbia_plugin_kaggle7_identification_depc(depc, kchip_rowid_list, config):
         python -m wbia_kaggle7._plugin --test-wbia_plugin_kaggle7_identification_depc
         python -m wbia_kaggle7._plugin --test-wbia_plugin_kaggle7_identification_depc:0
 
-    Example0:
-        >>> # ENABLE_DOCTEST
+    Example:
+        >>> # DISABLE_DOCTEST
         >>> from wbia_kaggle7._plugin import *  # NOQA
         >>> import wbia
         >>> import numpy as np
         >>> from wbia.init import sysres
         >>> dbdir = sysres.ensure_testdb_kaggle7()
-        >>> ibs = wbia.opendb(dbdir=dbdir)
+        >>> ibs = wbia.opendb(dbdir=dbdir, allow_newdir=True)
         >>> aid_list = ibs.get_image_aids(1)
         >>> response_list = ibs.depc_annot.get('KaggleSevenIdentification', aid_list, 'response')
         >>> response = response_list[0]
@@ -349,7 +358,7 @@ def wbia_plugin_kaggle7_identification_depc(depc, kchip_rowid_list, config):
 
 
 def get_match_results(depc, qaid_list, daid_list, score_list, config):
-    """ converts table results into format for ipython notebook """
+    """converts table results into format for ipython notebook"""
     # qaid_list, daid_list = request.get_parent_rowids()
     # score_list = request.score_list
     # config = request.config
@@ -398,12 +407,12 @@ class KaggleSevenConfig(dt.Config):  # NOQA
         python -m wbia_kaggle7._plugin --test-KaggleSevenConfig
 
     Example:
-        >>> # ENABLE_DOCTEST
+        >>> # DISABLE_DOCTEST
         >>> from wbia_kaggle7._plugin import *  # NOQA
         >>> config = KaggleSevenConfig()
         >>> result = config.get_cfgstr()
         >>> print(result)
-        KaggleSeven(dim_size=2000)
+        KaggleSeven()
     """
 
     def get_param_info_list(self):
@@ -472,7 +481,7 @@ def wbia_plugin_kaggle7(depc, qaid_list, daid_list, config):
         python -m wbia_kaggle7._plugin --exec-wbia_plugin_kaggle7
         python -m wbia_kaggle7._plugin --exec-wbia_plugin_kaggle7:0
 
-    Example0:
+    Example:
         >>> # DISABLE_DOCTEST
         >>> from wbia_kaggle7._plugin import *
         >>> import wbia
@@ -481,7 +490,7 @@ def wbia_plugin_kaggle7(depc, qaid_list, daid_list, config):
         >>> from wbia.init import sysres
         >>> import numpy as np
         >>> dbdir = sysres.ensure_testdb_kaggle7()
-        >>> ibs = wbia.opendb(dbdir=dbdir)
+        >>> ibs = wbia.opendb(dbdir=dbdir, allow_newdir=True)
         >>> depc = ibs.depc_annot
         >>> gid_list = ibs.get_valid_gids()[:1]
         >>> aid_list = ut.flatten(ibs.get_image_aids(gid_list))

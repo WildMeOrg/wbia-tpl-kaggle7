@@ -1,24 +1,17 @@
 # -*- coding: utf-8 -*-
-from fastprogress import master_bar, progress_bar
 from fastai.vision import *
 from fastai.metrics import accuracy
 from fastai.basic_data import *
 import pandas as pd
-from torch import optim
 import re
 import torch
 from fastai import *
-import torch.nn.functional as F
-from torch.nn.parameter import Parameter
-import torch.nn as nn
-import pretrainedmodels
 from collections import OrderedDict
-import math
 from arch import *
 from utils import *
 from losses import *
-import torchvision
-import os
+import numpy as np
+from functools import partial
 
 
 SZH, SZW = 400, 1550
@@ -61,7 +54,7 @@ if __name__ == '__main__':
                 singleton_ids.add(id_)
 
     fn2label = {row[1].Image: row[1].Id for row in df.iterrows()}
-    path2fn = lambda path: re.search('[\w-]*\.jpg$', path).group(0)  # NOQA
+    path2fn = lambda path: re.search(r'[\w-]*\.jpg$', path).group(0)  # NOQA
 
     num_classes = len(set(df.Id))
     network_model, mutliple = make_new_network(
@@ -180,7 +173,10 @@ if __name__ == '__main__':
 
     for round_num, (max_lr_, num_epochs_) in enumerate(max_lr_epochs_list):
         print('Round %d training (freeze)' % (round_num + 1,))
-        name = '%s-R%s-freeze' % (NAME, round_num,)
+        name = '%s-R%s-freeze' % (
+            NAME,
+            round_num,
+        )
         try:
             learn.load(name)
         except Exception:
@@ -199,7 +195,10 @@ if __name__ == '__main__':
             learn.save(name)
 
         print('Round %d training (unfreeze)' % (round_num + 1,))
-        name = '%s-R%s-unfreeze' % (NAME, round_num,)
+        name = '%s-R%s-unfreeze' % (
+            NAME,
+            round_num,
+        )
         try:
             learn.load(name)
         except Exception:

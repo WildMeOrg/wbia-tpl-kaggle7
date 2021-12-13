@@ -1,27 +1,16 @@
 # -*- coding: utf-8 -*-
-from fastprogress import master_bar, progress_bar
-
 # import matplotlib.pyplot as plt
 from fastai.vision import *
-from fastai.metrics import accuracy
 from fastai.basic_data import *
 
 # from skimage.util import montage
 import pandas as pd
-from torch import optim
-import re
 import torch
 from fastai import *
-import torch.nn.functional as F
-from torch.nn.parameter import Parameter
-import torch.nn as nn
 import numpy as np
-import torch
-import pandas as pd
-import torch.nn.functional as F
-from torch.nn.parameter import Parameter
-import torch.nn as nn
 from arch import *
+import os
+import PIL
 
 
 def mapk(preds, targs, k=5):
@@ -91,7 +80,7 @@ def get_train_features(learn, augment=3):
         all_preds0, all_gt0, all_feats0, all_preds20 = get_predictions(
             learn.model, learn.data.train_dl
         )
-    except:
+    except Exception:
         all_preds0, all_gt0, all_feats0, all_preds20 = get_predictions_non_PCB(
             learn.model, learn.data.train_dl
         )
@@ -102,7 +91,7 @@ def get_train_features(learn, augment=3):
             all_preds00, all_gt00, all_feats00, all_preds200 = get_predictions(
                 learn.model, learn.data.train_dl
             )
-        except:
+        except Exception:
             all_preds00, all_gt00, all_feats00, all_preds200 = get_predictions_non_PCB(
                 learn.model, learn.data.train_dl
             )
@@ -145,7 +134,13 @@ def write_augmentations(df, tfms, SZH, SZW, RING_HEADS):
         image = open_image(path)
         print('\t', path, image)
 
-        image.save('data/augmentations/%s_original%s' % (basename, ext,))
+        image.save(
+            'data/augmentations/%s_original%s'
+            % (
+                basename,
+                ext,
+            )
+        )
         for version in range(5):
             image_ = image.apply_tfms(
                 tfms[0],
@@ -176,7 +171,12 @@ def write_augmentations(df, tfms, SZH, SZW, RING_HEADS):
                     image_.data[2, :, (grid_w * w_) + offset] = color[2]
 
             image_.save(
-                'data/augmentations/%s_augmented_%d%s' % (basename, version, ext,)
+                'data/augmentations/%s_augmented_%d%s'
+                % (
+                    basename,
+                    version,
+                    ext,
+                )
             )
 
 
@@ -185,11 +185,10 @@ def get_predictions(model, val_loader):
         torch.cuda.empty_cache()
     model.eval()
     all_preds = []
-    all_confs = []
+    # all_confs = []
     all_feats = []
     all_preds2 = []
     all_gt = []
-    c = 0
     with torch.no_grad():
         for data1, label in val_loader:
             preds_list, feats_list = model(data1)
@@ -215,11 +214,10 @@ def get_predictions_non_PCB(model, val_loader):
         torch.cuda.empty_cache()
     model.eval()
     all_preds = []
-    all_confs = []
+    # all_confs = []
     all_feats = []
     all_preds2 = []
     all_gt = []
-    c = 0
     with torch.no_grad():
         for data1, label in val_loader:
             preds, feats, feats2 = model(data1)
@@ -332,7 +330,7 @@ def batched_dmv(d1, d2):
         out = distance_matrix_vector(
             d1.to(get_device()), d2.to(get_device()), d2_sq1.to(get_device())
         ).cpu()
-    except:
+    except Exception:
         out = distance_matrix_vector(d1, d2, d2_sq1).cpu()
     return out
 

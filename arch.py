@@ -1,27 +1,14 @@
 # -*- coding: utf-8 -*-
-from fastprogress import master_bar, progress_bar
-
 # import matplotlib.pyplot as plt
 from fastai.vision import *
-from fastai.metrics import accuracy
 from fastai.basic_data import *
 
 # from skimage.util import montage
-import pandas as pd
-from torch import optim
-import re
 import torch
 from fastai import *
-import torch.nn.functional as F
-from torch.nn.parameter import Parameter
-import torch.nn as nn
-import numpy as np
-import torch
-import pandas as pd
-import torch.nn.functional as F
-from torch.nn.parameter import Parameter
-import torch.nn as nn
 import torchvision
+import torch.nn as nn
+import torch.nn.functional as F
 
 
 def get_device():

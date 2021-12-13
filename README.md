@@ -84,4 +84,3 @@ cat data/train.crc.txt data/train.kaggle.stripped.txt > data/train.txt
 cat data/valid.crc.txt data/valid.kaggle.stripped.txt > data/valid.txt
 
 python add_bboxes_and_val_fns_and_sample_submission.py
-

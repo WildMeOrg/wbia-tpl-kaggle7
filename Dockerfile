@@ -3,7 +3,7 @@
 ##########################################################################################
 FROM nvidia/cuda:10.1-cudnn7-devel-ubuntu18.04 as org.wildme.wbia.pytorch
 
-MAINTAINER Wild Me <dev@wildme.org> 
+MAINTAINER Wild Me <dev@wildme.org>
 
 # Selectively disable Docker build caching in Azure DevOps Nightly CI builds
 ARG AZURE_DEVOPS_CACHEBUSTER=0
@@ -92,7 +92,7 @@ COPY ./*.py /opt/whale/
 RUN mkdir -p /data
 
 # Add symlink to /data
-RUN ln -s /data /opt/whale/data 
+RUN ln -s /data /opt/whale/data
 
 # Set workdir to the main repository for convenience
 WORKDIR /opt/whale/
@@ -132,7 +132,7 @@ COPY ./*.py /opt/whale/
 RUN mkdir -p /data
 
 # Add symlink to /data
-RUN ln -s /data /opt/whale/data 
+RUN ln -s /data /opt/whale/data
 
 # Set workdir to the main repository for convenience
 WORKDIR /opt/whale/

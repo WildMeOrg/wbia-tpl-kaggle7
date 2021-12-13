@@ -1,31 +1,27 @@
 # -*- coding: utf-8 -*-
-from fastprogress import master_bar, progress_bar
 from fastai.vision import *
-from fastai.metrics import accuracy
 from fastai.basic_data import *
 import pandas as pd
-from torch import optim
 import re
 import torch
 from fastai import *
-import torch.nn.functional as F
-from torch.nn.parameter import Parameter
 import torch.nn as nn
-import pretrainedmodels
-from collections import OrderedDict
-import math
 from arch import *
 from utils import *
 from losses import *
 from PureMagic import *
-from PureMagic import ModelReId
 import torchvision
+import os
 
 df = pd.read_csv('data/train.csv')
 # val_fns = pd.read_pickle('data/val_fns')
 val_fns = ['69823499d.jpg']
 fn2label = {row[1].Image: row[1].Id for row in df.iterrows()}
-path2fn = lambda path: re.search('[\w-]*\.jpg$', path).group(0)
+
+
+def path2fn(path):
+    return re.search(r'[\w-]*\.jpg$', path).group(0)
+
 
 SZ = 384
 BS = 20
@@ -102,7 +98,7 @@ print('Stage 2 done, starting stage 3')
 
 print('Stage 2 done, stage 3 done')
 
-####### Validation
+# ###### Validation
 df = pd.read_csv('data/train.csv')
 classes = learn.data.classes + ['new_whale']
 data = (
@@ -124,10 +120,10 @@ data.train_dl.dl.batch_sampler.drop_last = False
 learn.data = data
 
 
-####### Now features
+# ###### Now features
 train_feats, train_labels = get_train_features(learn, augment=0)
 thresholds = torch.load(name.replace('NOVAL', 'val') + '_thresholds.pth')
-#### Test feats
+# ### Test feats
 test_preds, test_gt, test_feats, test_preds2 = get_predictions(learn.model, data.test_dl)
 preds_t = torch.softmax(thresholds['softmax'] * test_preds, dim=1)
 preds_t = torch.cat((preds_t, torch.ones_like(preds_t[:, :1])), 1)

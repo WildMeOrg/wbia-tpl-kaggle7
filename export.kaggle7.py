@@ -9,7 +9,7 @@ import tqdm
 import cv2
 
 
-# ibs = None
+ibs = None
 
 
 MIN_AIDS = 1
@@ -56,15 +56,15 @@ print('FB Num unknown acmids: %d' % (gid_list.count(None),))
 print('FB Num unknown names: %d' % (len(unknown_name_list),))
 
 flag_list = [gid is not None for gid in gid_list]
-gid_list                  = ut.compress(gid_list, flag_list)
+gid_list = ut.compress(gid_list, flag_list)
 flukebook_image_uuid_list = ut.compress(flukebook_image_uuid_list, flag_list)
-flukebook_name_text_list  = ut.compress(flukebook_name_text_list, flag_list)
+flukebook_name_text_list = ut.compress(flukebook_name_text_list, flag_list)
 assert None not in gid_list
 
 print('DE-NONE-ING')
-print('FB Num records: %d' % (len(flukebook_name_text_list), ))
-print('FB Num unique acmids: %d' % (len(set(flukebook_image_acmid_list)), ))
-print('FB Num unique names: %d' % (len(set(flukebook_name_text_list)), ))
+print('FB Num records: %d' % (len(flukebook_name_text_list),))
+print('FB Num unique acmids: %d' % (len(set(flukebook_image_acmid_list)),))
+print('FB Num unique names: %d' % (len(set(flukebook_name_text_list)),))
 
 
 # FIND DETECTIONS
@@ -104,7 +104,7 @@ for global_aid in global_aid_list:
     flag_list.append(flag)
     seen_aid_set.add(global_aid)
 
-global_aid_list  = ut.compress(global_aid_list, flag_list)
+global_aid_list = ut.compress(global_aid_list, flag_list)
 global_name_list = ut.compress(global_name_list, flag_list)
 ibs.set_annot_names(global_aid_list, global_name_list)
 
