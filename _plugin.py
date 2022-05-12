@@ -28,7 +28,7 @@ u"""
 Interfacing with the ACR from python is a headache, so for now we will assume that
 the docker image has already been downloaded. Command:
 
-docker pull wildme.azurecr.io/wbia/kaggle7:latest
+docker pull wildme/wbia-plugin-kaggle7:latest
 """
 
 
